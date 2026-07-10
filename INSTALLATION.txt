@@ -1,0 +1,17 @@
+PubliService — Historique Supabase + dashboard simplifié
+
+1. Copiez le contenu du dossier src dans :
+   C:\Users\Jérémy Giuliana\Documents\publiservice\src
+
+2. Acceptez le remplacement des fichiers.
+
+3. Vérifiez que la table stock_movements et ses politiques RLS ont bien été créées.
+
+4. Relancez Vite si nécessaire :
+   npm run dev
+
+Fichiers modifiés :
+- src/App.jsx
+- src/pages/Dashboard.jsx
+- src/pages/Inventory.jsx
+- src/services/movementService.js
