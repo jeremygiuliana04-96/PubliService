@@ -24,7 +24,7 @@ const formatMovementDate = (value) => {
   return `${dayLabel}, ${time}`
 }
 
-function Dashboard({ publications, movements, onNavigate, onLogout, logoutLoading = false }) {
+function Dashboard({ publications, movements, currentAssembly, onNavigate, onLogout, logoutLoading = false }) {
   const totalStock = publications.reduce((sum, item) => sum + item.stock, 0)
   const lowStock = publications.filter((item) => item.stock <= item.minimum).length
   const distributed = movements
@@ -33,8 +33,12 @@ function Dashboard({ publications, movements, onNavigate, onLogout, logoutLoadin
   const recentMovements = movements.slice(0, 5)
 
   const handleNavigation = (label) => {
-    if (label === 'Stock') onNavigate('inventory')
-  }
+  if (label === 'Accueil') onNavigate('dashboard')
+  if (label === 'Publications') onNavigate('inventory')
+  if (label === 'Proclamateurs') onNavigate('publishers')
+  if (label === 'Assemblée') onNavigate('assemblies')
+  if (label === 'Plus') onNavigate('more')
+}
 
   return (
     <section className="phone-page dashboard-page">
@@ -42,7 +46,7 @@ function Dashboard({ publications, movements, onNavigate, onLogout, logoutLoadin
         <div className="dashboard-topline">
           <div>
             <p className="app-name">PubliService</p>
-            <h1>Assemblée de Binche</h1>
+            <p>Assemblée de {currentAssembly?.name ?? '—'}</p>
           </div>
           <button className="header-icon" type="button" aria-label="Notifications"><BellIcon /></button>
         </div>
@@ -75,10 +79,6 @@ function Dashboard({ publications, movements, onNavigate, onLogout, logoutLoadin
             ))}
           </div>
         </section>
-
-        <button className="logout-link" type="button" onClick={onLogout} disabled={logoutLoading}>
-          {logoutLoading ? 'Déconnexion…' : 'Se déconnecter'}
-        </button>
       </div>
 
       <BottomNav active="Accueil" onChange={handleNavigation} />

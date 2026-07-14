@@ -21,3 +21,17 @@ export function DownloadIcon() { return <svg viewBox="0 0 24 24" aria-hidden="tr
 export function UploadIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9m0 0 4 4m-4-4-4 4M4 5h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> }
 export function FileIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l4 4v16H6V2Z" fill="none" stroke="currentColor" strokeWidth="2"/><path d="M14 2v5h5M9 12h6M9 16h6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> }
 export function BellIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M10 20h4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> }
+export function AssemblyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4 10h16M6 10v9M10 10v9M14 10v9M18 10v9M3 19h18M12 3l9 5H3l9-5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

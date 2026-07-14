@@ -11,27 +11,92 @@ const formatMovementDate = (value) =>
     minute: '2-digit',
   }).format(new Date(value))
 
-function Inventory({ publications, movements, onAdd, onChangeStock, onNavigate }) {
-  const [selected, setSelected] = useState(null)
-  const [showAdd, setShowAdd] = useState(false)
+function Inventory({
+  publications = [],
+  movements = [],
+  onAdd,
+  onChangeStock,
+  onDelete,
+  onNavigate,
+}) {
+  const [selectedId, setSelectedId] = useState(null)
+  const [showAddForm, setShowAddForm] = useState(false)
   const [movementType, setMovementType] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [showHistory, setShowHistory] = useState(false)
+
   const [name, setName] = useState('')
-  const [stock, setStock] = useState('')
-  const [minimum, setMinimum] = useState('10')
+  const [initialStock, setInitialStock] = useState('')
+
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
-  const selectedPublication = publications.find((item) => item.id === selected)
-  const publicationHistory = useMemo(
-    () => movements.filter((item) => item.publicationId === selected),
-    [movements, selected],
+  const selectedPublication = publications.find(
+    (publication) => publication.id === selectedId,
   )
+
+  const publicationHistory = useMemo(
+    () =>
+      movements.filter(
+        (movement) => movement.publicationId === selectedId,
+      ),
+    [movements, selectedId],
+  )
+
+  const totalStock = publications.reduce(
+    (total, publication) =>
+      total + Number(publication.stock ?? 0),
+    0,
+  )
+
+  const handleNavigation = (label) => {
+    if (label === 'Accueil') onNavigate('dashboard')
+    if (label === 'Publications') onNavigate('inventory')
+    if (label === 'Proclamateurs') onNavigate('publishers')
+    if (label === 'Assemblée') onNavigate('assemblies')
+    if (label === 'Plus') onNavigate('more')
+  }
+
+  const resetAddForm = () => {
+    setName('')
+    setInitialStock('')
+    setFormError('')
+  }
+
+  const closeAddForm = () => {
+    if (saving) return
+
+    setShowAddForm(false)
+    resetAddForm()
+  }
+
+  const openPublicationDetails = (publicationId) => {
+    setFormError('')
+    setMovementType(null)
+    setQuantity('')
+    setShowHistory(false)
+    setSelectedId(publicationId)
+  }
+
+  const closePublicationDetails = () => {
+    if (saving) return
+
+    setSelectedId(null)
+    setMovementType(null)
+    setQuantity('')
+    setShowHistory(false)
+    setFormError('')
+  }
 
   const submitPublication = async (event) => {
     event.preventDefault()
+
     const cleanName = name.trim()
+    const cleanStock = Math.max(
+      0,
+      Number(initialStock) || 0,
+    )
+
     if (!cleanName || saving) return
 
     setSaving(true)
@@ -40,13 +105,11 @@ function Inventory({ publications, movements, onAdd, onChangeStock, onNavigate }
     try {
       await onAdd({
         name: cleanName,
-        stock: Math.max(0, Number(stock) || 0),
-        minimum: Math.max(0, Number(minimum) || 10),
+        stock: cleanStock,
       })
-      setName('')
-      setStock('')
-      setMinimum('10')
-      setShowAdd(false)
+
+      setShowAddForm(false)
+      resetAddForm()
     } catch (error) {
       setFormError(error.message)
     } finally {
@@ -56,14 +119,38 @@ function Inventory({ publications, movements, onAdd, onChangeStock, onNavigate }
 
   const submitMovement = async (event) => {
     event.preventDefault()
-    const parsedQuantity = Math.max(0, Number(quantity) || 0)
-    if (!selectedPublication || parsedQuantity === 0 || saving) return
+
+    if (!selectedPublication || saving) return
+
+    const cleanQuantity = Math.max(
+      0,
+      Number(quantity) || 0,
+    )
+
+    if (cleanQuantity === 0) {
+      setFormError('Indique une quantité supérieure à zéro.')
+      return
+    }
+
+    if (
+      movementType === 'remove' &&
+      cleanQuantity > selectedPublication.stock
+    ) {
+      setFormError(
+        'La quantité distribuée dépasse le stock disponible.',
+      )
+      return
+    }
+
+    const amount =
+      movementType === 'add'
+        ? cleanQuantity
+        : -cleanQuantity
 
     setSaving(true)
     setFormError('')
 
     try {
-      const amount = movementType === 'add' ? parsedQuantity : -parsedQuantity
       await onChangeStock(selectedPublication.id, amount)
       setQuantity('')
       setMovementType(null)
@@ -74,17 +161,31 @@ function Inventory({ publications, movements, onAdd, onChangeStock, onNavigate }
     }
   }
 
-  const closeDetails = () => {
-    if (saving) return
-    setSelected(null)
-    setMovementType(null)
-    setQuantity('')
-    setShowHistory(false)
-    setFormError('')
-  }
+  const removeSelectedPublication = async () => {
+    if (!selectedPublication || saving) return
 
-  const handleNavigation = (label) => {
-    if (label === 'Accueil') onNavigate('dashboard')
+    const confirmed = window.confirm(
+      'Supprimer définitivement « ' +
+        selectedPublication.name +
+        ' » ?',
+    )
+
+    if (!confirmed) return
+
+    setSaving(true)
+    setFormError('')
+
+    try {
+      await onDelete(selectedPublication.id)
+      setSelectedId(null)
+      setMovementType(null)
+      setQuantity('')
+      setShowHistory(false)
+    } catch (error) {
+      setFormError(error.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -94,7 +195,15 @@ function Inventory({ publications, movements, onAdd, onChangeStock, onNavigate }
           <p>PubliService</p>
           <h1>Inventaire</h1>
         </div>
-        <button className="inventory-add-button" type="button" onClick={() => { setFormError(''); setShowAdd(true) }}>
+
+        <button
+          className="inventory-add-button"
+          type="button"
+          onClick={() => {
+            resetAddForm()
+            setShowAddForm(true)
+          }}
+        >
           <PlusIcon />
           <span>Ajouter</span>
         </button>
@@ -102,120 +211,352 @@ function Inventory({ publications, movements, onAdd, onChangeStock, onNavigate }
 
       <div className="inventory-content">
         <div className="inventory-summary">
-          <span>{publications.length} publications</span>
-          <strong>{publications.reduce((sum, item) => sum + item.stock, 0)} exemplaires</strong>
+          <span>
+            {publications.length}{' '}
+            {publications.length > 1
+              ? 'publications'
+              : 'publication'}
+          </span>
+
+          <strong>
+            {totalStock}{' '}
+            {totalStock > 1 ? 'exemplaires' : 'exemplaire'}
+          </strong>
         </div>
 
-        <div className="publication-list">
-          {publications.map((publication) => {
-            const low = publication.stock <= publication.minimum
-            return (
+        {publications.length === 0 ? (
+          <div className="publishers-empty">
+            <span className="publishers-empty__icon">
+              <BookIcon />
+            </span>
+
+            <h2>Aucune publication</h2>
+
+            <p>
+              Les publications ajoutées apparaîtront ici.
+            </p>
+
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => setShowAddForm(true)}
+            >
+              Ajouter une publication
+            </button>
+          </div>
+        ) : (
+          <div className="publication-list">
+            {publications.map((publication) => (
               <button
                 className="publication-card"
                 type="button"
                 key={publication.id}
-                onClick={() => { setFormError(''); setSelected(publication.id) }}
+                onClick={() =>
+                  openPublicationDetails(publication.id)
+                }
               >
-                <span className="publication-icon"><BookIcon /></span>
+                <span className="publication-icon">
+                  <BookIcon />
+                </span>
+
                 <span className="publication-info">
                   <strong>{publication.name}</strong>
                   <small>Stock actuel</small>
                 </span>
-                <span className={`stock-pill ${low ? 'stock-pill--low' : ''}`}>{publication.stock}</span>
+
+                <span
+                  className={`stock-pill ${
+                    publication.stock === 0
+                      ? 'stock-pill--low'
+                      : ''
+                  }`}
+                >
+                  {publication.stock}
+                </span>
+
                 <span className="publication-chevron">›</span>
               </button>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {selectedPublication && (
-        <div className="sheet-backdrop" onClick={closeDetails}>
-          <section className="detail-sheet" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="sheet-backdrop"
+          onClick={closePublicationDetails}
+        >
+          <section
+            className="detail-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="sheet-handle" />
+
             <div className="detail-title">
-              <span><BookIcon /></span>
-              <div><small>Publication</small><h2>{selectedPublication.name}</h2></div>
+              <span>
+                <BookIcon />
+              </span>
+
+              <div>
+                <small>Publication</small>
+                <h2>{selectedPublication.name}</h2>
+              </div>
             </div>
+
             <div className="stock-display">
               <small>Stock actuel</small>
               <strong>{selectedPublication.stock}</strong>
             </div>
 
-            {formError && <p className="form-message form-message--error">{formError}</p>}
+            {formError && (
+              <p className="form-message form-message--error">
+                {formError}
+              </p>
+            )}
 
             {!movementType && !showHistory && (
               <>
                 <div className="stock-actions">
-                  <button type="button" onClick={() => { setFormError(''); setMovementType('add') }}>+ Ajouter du stock</button>
-                  <button type="button" onClick={() => { setFormError(''); setMovementType('remove') }} disabled={selectedPublication.stock === 0}>− Distribuer</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormError('')
+                      setQuantity('')
+                      setMovementType('add')
+                    }}
+                  >
+                    + Ajouter du stock
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormError('')
+                      setQuantity('')
+                      setMovementType('remove')
+                    }}
+                    disabled={selectedPublication.stock === 0}
+                  >
+                    − Distribuer
+                  </button>
                 </div>
-                <button className="history-button" type="button" onClick={() => setShowHistory(true)}>Voir l’historique</button>
+
+                <button
+                  className="history-button"
+                  type="button"
+                  onClick={() => {
+                    setFormError('')
+                    setShowHistory(true)
+                  }}
+                >
+                  Voir l’historique
+                </button>
+
+                <button
+                  className="sheet-close publisher-delete-button"
+                  type="button"
+                  onClick={removeSelectedPublication}
+                  disabled={saving}
+                >
+                  Supprimer la publication
+                </button>
+
+                <button
+                  className="sheet-close"
+                  type="button"
+                  onClick={closePublicationDetails}
+                  disabled={saving}
+                >
+                  Fermer
+                </button>
               </>
             )}
 
             {movementType && (
-              <form className="movement-form" onSubmit={submitMovement}>
-                <h3>{movementType === 'add' ? 'Ajouter du stock' : 'Distribuer'}</h3>
+              <form
+                className="movement-form"
+                onSubmit={submitMovement}
+              >
+                <h3>
+                  {movementType === 'add'
+                    ? 'Ajouter du stock'
+                    : 'Distribuer'}
+                </h3>
+
                 <label>
                   Quantité
                   <input
-                    value={quantity}
-                    onChange={(event) => setQuantity(event.target.value)}
                     type="number"
                     inputMode="numeric"
                     min="1"
-                    max={movementType === 'remove' ? selectedPublication.stock : undefined}
+                    max={
+                      movementType === 'remove'
+                        ? selectedPublication.stock
+                        : undefined
+                    }
+                    value={quantity}
+                    onChange={(event) =>
+                      setQuantity(event.target.value)
+                    }
                     placeholder="0"
                     autoFocus
                     disabled={saving}
                   />
                 </label>
-                <button className="primary-button" type="submit" disabled={saving}>{saving ? 'Enregistrement…' : 'Valider'}</button>
-                <button className="sheet-close" type="button" disabled={saving} onClick={() => { setMovementType(null); setQuantity(''); setFormError('') }}>Retour</button>
+
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={saving}
+                >
+                  {saving ? 'Enregistrement…' : 'Valider'}
+                </button>
+
+                <button
+                  className="sheet-close"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    setMovementType(null)
+                    setQuantity('')
+                    setFormError('')
+                  }}
+                >
+                  Retour
+                </button>
               </form>
             )}
 
             {showHistory && (
               <div className="publication-history">
-                <div className="history-heading"><h3>Historique</h3><button type="button" onClick={() => setShowHistory(false)}>Retour</button></div>
+                <div className="history-heading">
+                  <h3>Historique</h3>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory(false)}
+                  >
+                    Retour
+                  </button>
+                </div>
+
                 {publicationHistory.length === 0 ? (
-                  <p className="empty-history">Aucun mouvement pour cette publication.</p>
-                ) : publicationHistory.map((item) => (
-                  <article className="history-row" key={item.id}>
-                    <span className={item.amount > 0 ? 'history-amount history-amount--positive' : 'history-amount history-amount--negative'}>
-                      {item.amount > 0 ? '+' : '−'}{Math.abs(item.amount)}
-                    </span>
-                    <div><strong>{item.type}</strong><small>{formatMovementDate(item.createdAt)}</small></div>
-                  </article>
-                ))}
+                  <p className="empty-history">
+                    Aucun mouvement pour cette publication.
+                  </p>
+                ) : (
+                  publicationHistory.map((movement) => (
+                    <article
+                      className="history-row"
+                      key={movement.id}
+                    >
+                      <span
+                        className={
+                          movement.amount > 0
+                            ? 'history-amount history-amount--positive'
+                            : 'history-amount history-amount--negative'
+                        }
+                      >
+                        {movement.amount > 0 ? '+' : '−'}
+                        {Math.abs(movement.amount)}
+                      </span>
+
+                      <div>
+                        <strong>{movement.type}</strong>
+                        <small>
+                          {formatMovementDate(
+                            movement.createdAt,
+                          )}
+                        </small>
+                      </div>
+                    </article>
+                  ))
+                )}
               </div>
             )}
-
-            {!movementType && <button className="sheet-close" type="button" onClick={closeDetails}>Fermer</button>}
           </section>
         </div>
       )}
 
-      {showAdd && (
-        <div className="sheet-backdrop" onClick={() => { if (!saving) setShowAdd(false) }}>
-          <section className="detail-sheet" onClick={(event) => event.stopPropagation()}>
+      {showAddForm && (
+        <div
+          className="sheet-backdrop"
+          onClick={closeAddForm}
+        >
+          <section
+            className="detail-sheet"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="sheet-handle" />
+
             <h2>Ajouter une publication</h2>
-            <form className="publication-form" onSubmit={submitPublication}>
-              <label>Nom de la publication<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex. Brochure" autoFocus disabled={saving} /></label>
-              <label>Stock initial<input value={stock} onChange={(event) => setStock(event.target.value)} inputMode="numeric" type="number" min="0" placeholder="0" disabled={saving} /></label>
-              <label>Seuil de stock faible<input value={minimum} onChange={(event) => setMinimum(event.target.value)} inputMode="numeric" type="number" min="0" disabled={saving} /></label>
-              <p className="form-note">Le seuil est prérempli à 10, mais tu peux le modifier.</p>
-              {formError && <p className="form-message form-message--error">{formError}</p>}
-              <button className="primary-button" type="submit" disabled={saving}>{saving ? 'Ajout…' : 'Ajouter à l’inventaire'}</button>
-              <button className="sheet-close" type="button" disabled={saving} onClick={() => { setShowAdd(false); setFormError('') }}>Annuler</button>
+
+            <form
+              className="publication-form"
+              onSubmit={submitPublication}
+            >
+              <label>
+                Nom de la publication
+                <input
+                  value={name}
+                  onChange={(event) =>
+                    setName(event.target.value)
+                  }
+                  placeholder="Ex. Brochure"
+                  autoFocus
+                  disabled={saving}
+                  required
+                />
+              </label>
+
+              <label>
+                Stock initial
+                <input
+                  value={initialStock}
+                  onChange={(event) =>
+                    setInitialStock(event.target.value)
+                  }
+                  inputMode="numeric"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  disabled={saving}
+                />
+              </label>
+
+              {formError && (
+                <p className="form-message form-message--error">
+                  {formError}
+                </p>
+              )}
+
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={saving}
+              >
+                {saving
+                  ? 'Ajout…'
+                  : 'Ajouter à l’inventaire'}
+              </button>
+
+              <button
+                className="sheet-close"
+                type="button"
+                disabled={saving}
+                onClick={closeAddForm}
+              >
+                Annuler
+              </button>
             </form>
           </section>
         </div>
       )}
 
-      <BottomNav active="Stock" onChange={handleNavigation} />
+      <BottomNav
+        active="Publications"
+        onChange={handleNavigation}
+      />
     </section>
   )
 }
