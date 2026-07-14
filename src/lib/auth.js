@@ -4,7 +4,9 @@ export async function signInAdministrator(email, password) {
   const cleanEmail = email.trim().toLowerCase()
 
   if (!cleanEmail || !password) {
-    throw new Error('Veuillez compléter l’adresse e-mail et le mot de passe.')
+    throw new Error(
+      'Veuillez compléter l’adresse e-mail et le mot de passe.',
+    )
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -13,25 +15,39 @@ export async function signInAdministrator(email, password) {
   })
 
   if (error) {
-    if (error.message.toLowerCase().includes('invalid login credentials')) {
-      throw new Error('Adresse e-mail ou mot de passe incorrect.')
+    const errorMessage = error.message.toLowerCase()
+
+    if (errorMessage.includes('invalid login credentials')) {
+      throw new Error(
+        'Adresse e-mail ou mot de passe incorrect.',
+      )
     }
 
-    if (error.message.toLowerCase().includes('email not confirmed')) {
-      throw new Error('Votre adresse e-mail doit encore être confirmée.')
+    if (errorMessage.includes('email not confirmed')) {
+      throw new Error(
+        'Votre adresse e-mail doit encore être confirmée.',
+      )
     }
 
-    console.error(error)
+    console.error('Erreur Supabase :', error)
 
-    throw new Error(error.message)
+    throw new Error(
+      error.message ||
+        error.error_description ||
+        'Connexion impossible pour le moment.',
+    )
+  }
 
   return data
 }
 
 export async function signOutAdministrator() {
   const { error } = await supabase.auth.signOut()
+
   if (error) {
-    throw new Error('La déconnexion a échoué. Réessayez.')
+    throw new Error(
+      'La déconnexion a échoué. Réessayez.',
+    )
   }
 }
 
@@ -39,14 +55,19 @@ export async function sendPasswordReset(email) {
   const cleanEmail = email.trim().toLowerCase()
 
   if (!cleanEmail) {
-    throw new Error('Indiquez d’abord votre adresse e-mail.')
+    throw new Error(
+      'Indiquez d’abord votre adresse e-mail.',
+    )
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-    redirectTo: window.location.origin,
-  })
+  const { error } =
+    await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: window.location.origin,
+    })
 
   if (error) {
-    throw new Error('Impossible d’envoyer l’e-mail de réinitialisation.')
+    throw new Error(
+      'Impossible d’envoyer l’e-mail de réinitialisation.',
+    )
   }
 }
