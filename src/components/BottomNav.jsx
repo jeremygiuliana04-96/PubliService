@@ -1,8 +1,8 @@
 import {
   HomeIcon,
   BookIcon,
-  SettingsIcon,
   AssemblyIcon,
+  SettingsIcon,
 } from './Icons'
 
 function PeopleIcon() {

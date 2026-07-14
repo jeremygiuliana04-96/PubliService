@@ -21,8 +21,9 @@ export async function signInAdministrator(email, password) {
       throw new Error('Votre adresse e-mail doit encore être confirmée.')
     }
 
-    throw new Error('Connexion impossible pour le moment. Réessayez dans quelques instants.')
-  }
+    console.error(error)
+
+    throw new Error(error.message)
 
   return data
 }
