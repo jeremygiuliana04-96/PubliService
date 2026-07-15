@@ -49,8 +49,8 @@ function More({
           <button className="more-row" type="button" onClick={() => setShowCodeSheet(true)}>
             <span className="more-row-icon more-row-icon--key">••••••</span>
             <span className="more-row-text">
-              <strong>Code d’accès</strong>
-              <small>Gérer le code à 6 chiffres</small>
+            <strong>Assemblée</strong>
+            <small>Gérer le nom et le code d’accès</small>
             </span>
             <Chevron />
           </button>
@@ -80,7 +80,7 @@ function More({
         </section>
       </div>
 
-      <AccessCodeSheet open={showCodeSheet} onClose={() => setShowCodeSheet(false)} />
+      <AccessCodeSheet open={showCodeSheet} onClose={() => setShowCodeSheet(false)} currentAssembly={currentAssembly} />
       <AdminSheet
         open={showAdminSheet}
         onClose={() => setShowAdminSheet(false)}
