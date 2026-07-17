@@ -4,7 +4,9 @@ const mapAssembly = (assembly) => ({
   id: assembly.id,
   name: assembly.name,
   isActive: assembly.is_active ?? true,
-  code: assembly.assembly_codes?.[0]?.current_code ?? '',
+  code: Array.isArray(assembly.assembly_codes)
+    ? assembly.assembly_codes[0]?.current_code ?? ''
+    : assembly.assembly_codes?.current_code ?? '',
   createdAt: assembly.created_at,
   updatedAt: assembly.updated_at,
 })
@@ -42,7 +44,7 @@ export async function getAssemblies() {
 
   if (error) {
     throw new Error(
-      `Impossible de charger les assemblées : ${error.message}`,
+      `Impossible de charger les assemblÃ©es : ${error.message}`,
     )
   }
 
@@ -60,7 +62,7 @@ async function codeAlreadyExists(code) {
 
   if (error) {
     throw new Error(
-      `Impossible de vérifier le code d’accès : ${error.message}`,
+      `Impossible de vÃ©rifier le code dâ€™accÃ¨s : ${error.message}`,
     )
   }
 
@@ -77,7 +79,7 @@ export async function generateUniqueAssemblyCode() {
   }
 
   throw new Error(
-    'Impossible de générer un code unique. Réessaie.',
+    'Impossible de gÃ©nÃ©rer un code unique. RÃ©essaie.',
   )
 }
 
@@ -88,7 +90,7 @@ export async function createAssembly({
   const cleanName = name.trim()
 
   if (!cleanName) {
-    throw new Error('Le nom de l’assemblée est obligatoire.')
+    throw new Error('Le nom de lâ€™assemblÃ©e est obligatoire.')
   }
 
   const cleanRequestedCode = requestedCode
@@ -100,7 +102,7 @@ export async function createAssembly({
     cleanRequestedCode.length !== 6
   ) {
     throw new Error(
-      'Le code d’accès doit contenir exactement 6 chiffres.',
+      'Le code dâ€™accÃ¨s doit contenir exactement 6 chiffres.',
     )
   }
 
@@ -109,7 +111,7 @@ export async function createAssembly({
 
   if (await codeAlreadyExists(accessCode)) {
     throw new Error(
-      'Ce code d’accès est déjà utilisé par une autre assemblée.',
+      'Ce code dâ€™accÃ¨s est dÃ©jÃ  utilisÃ© par une autre assemblÃ©e.',
     )
   }
 
@@ -125,7 +127,7 @@ export async function createAssembly({
 
   if (assemblyError) {
     throw new Error(
-      `Impossible de créer l’assemblée : ${assemblyError.message}`,
+      `Impossible de crÃ©er lâ€™assemblÃ©e : ${assemblyError.message}`,
     )
   }
 
@@ -147,7 +149,7 @@ export async function createAssembly({
       .eq('id', assembly.id)
 
     throw new Error(
-      `Impossible de créer le code d’accès : ${codeError.message}`,
+      `Impossible de crÃ©er le code dâ€™accÃ¨s : ${codeError.message}`,
     )
   }
 
@@ -164,7 +166,7 @@ export async function updateAssemblyName(
   const cleanName = name.trim()
 
   if (!cleanName) {
-    throw new Error('Le nom de l’assemblée est obligatoire.')
+    throw new Error('Le nom de lâ€™assemblÃ©e est obligatoire.')
   }
 
   const { data, error } = await supabase
@@ -179,7 +181,7 @@ export async function updateAssemblyName(
 
   if (error) {
     throw new Error(
-      `Impossible de modifier l’assemblée : ${error.message}`,
+      `Impossible de modifier lâ€™assemblÃ©e : ${error.message}`,
     )
   }
 
@@ -206,7 +208,7 @@ export async function regenerateAssemblyCode(assemblyId) {
 
   if (error) {
     throw new Error(
-      `Impossible de régénérer le code : ${error.message}`,
+      `Impossible de rÃ©gÃ©nÃ©rer le code : ${error.message}`,
     )
   }
 
@@ -224,7 +226,39 @@ export async function archiveAssembly(assemblyId) {
 
   if (error) {
     throw new Error(
-      `Impossible d’archiver l’assemblée : ${error.message}`,
+      `Impossible dâ€™archiver lâ€™assemblÃ©e : ${error.message}`,
     )
+  }
+}
+
+export async function loginWithAssemblyCode(code) {
+  const cleanCode = String(code).replace(/\D/g, '')
+
+  if (cleanCode.length !== 6) {
+    throw new Error('Le code dâ€™accÃ¨s doit contenir 6 chiffres.')
+  }
+
+  const { data, error } = await supabase.rpc(
+    'verify_assembly_access_code',
+    {
+      p_code: cleanCode,
+    },
+  )
+
+  if (error) {
+    throw new Error(
+      `Impossible de vÃ©rifier le code : ${error.message}`,
+    )
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Code dâ€™accÃ¨s invalide.')
+  }
+
+    return {
+    id: data[0].id,
+    name: data[0].name,
+    isActive: data[0].is_active,
+    code: cleanCode,
   }
 }

@@ -27,11 +27,12 @@ function PeopleIcon() {
 function BottomNav({
   active = 'Accueil',
   onChange,
-  isAdmin = true,
+  isAdmin = false,
 }) {
   const items = [
     ['Accueil', <HomeIcon key="home" />],
     ['Publications', <BookIcon key="book" />],
+    ['Distribution', <BookIcon key="distribution" />],
     ['Proclamateurs', <PeopleIcon key="people" />],
   ]
 
@@ -42,7 +43,10 @@ function BottomNav({
     ])
   }
 
-  items.push(['Plus', <SettingsIcon key="settings" />])
+  items.push([
+    'Plus',
+    <SettingsIcon key="settings" />,
+  ])
 
   return (
     <nav
@@ -67,3 +71,4 @@ function BottomNav({
 }
 
 export default BottomNav
+

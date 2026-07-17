@@ -49,7 +49,7 @@ function AdminSheet({ open, onClose, onCountChange }) {
       if (error) throw error
       setEmail('')
       setMessageType('success')
-      setMessage('Administrateur ajouté.')
+      setMessage('Administrateur ajoutÃ©.')
       await loadAdmins()
     } catch (error) {
       console.error("Ajout de l'administrateur impossible :", error)
@@ -69,9 +69,9 @@ function AdminSheet({ open, onClose, onCountChange }) {
         <h2>Administrateurs</h2>
 
         {loading ? (
-          <p className="empty-history">Chargement…</p>
+          <p className="empty-history">Chargementâ€¦</p>
         ) : admins.length === 0 ? (
-          <p className="empty-history">Aucun administrateur trouvé.</p>
+          <p className="empty-history">Aucun administrateur trouvÃ©.</p>
         ) : (
           <div className="publication-history">
             {admins.map((admin) => (
@@ -83,8 +83,8 @@ function AdminSheet({ open, onClose, onCountChange }) {
                   <strong>{admin.email}</strong>
                   <small>
                     {admin.is_current_user
-                      ? 'Compte actuellement connecté'
-                      : 'Administrateur de l’assemblée'}
+                      ? 'Compte actuellement connectÃ©'
+                      : 'Administrateur de lâ€™assemblÃ©e'}
                   </small>
                 </div>
               </article>
@@ -109,7 +109,7 @@ function AdminSheet({ open, onClose, onCountChange }) {
           {message && <p className={`form-message form-message--${messageType}`}>{message}</p>}
 
           <button className="primary-button" type="submit" disabled={saving}>
-            {saving ? 'Ajout…' : 'Ajouter un administrateur'}
+            {saving ? 'Ajoutâ€¦' : 'Ajouter un administrateur'}
           </button>
         </form>
 
@@ -120,3 +120,4 @@ function AdminSheet({ open, onClose, onCountChange }) {
 }
 
 export default AdminSheet
+

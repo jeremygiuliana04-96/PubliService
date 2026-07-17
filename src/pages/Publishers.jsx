@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import BottomNav from '../components/BottomNav'
 import {
   getPublisherPublications,
@@ -50,10 +50,12 @@ const createEmptyQuantities = (publications) =>
 function Publishers({
   publishers = [],
   publications = [],
+  currentAssembly,
   onAdd,
   onUpdate,
   onDelete,
   onNavigate,
+  isAdmin = false,
 }) {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -87,6 +89,7 @@ function Publishers({
   const handleNavigation = (label) => {
     if (label === 'Accueil') onNavigate('dashboard')
     if (label === 'Publications') onNavigate('inventory')
+  if (label === 'Distribution') onNavigate('distribution')
     if (label === 'Proclamateurs') onNavigate('publishers')
     if (label === 'Assemblée') onNavigate('assemblies')
     if (label === 'Plus') onNavigate('more')
@@ -119,7 +122,12 @@ function Publishers({
     setLoadingDetails(true)
 
     try {
-      const savedQuantities = await getPublisherPublications(publisher.id)
+      const savedQuantities =
+        await getPublisherPublications(
+          publisher.id,
+          currentAssembly?.id,
+          currentAssembly?.code,
+        )
 
       setPublicationQuantities(
         publications.map((publication) => {
@@ -205,6 +213,8 @@ function Publishers({
       await saveAllPublisherPublications(
         savedPublisher.id,
         publicationQuantities,
+        currentAssembly?.id,
+        currentAssembly?.code,
       )
 
       setShowForm(false)
@@ -555,9 +565,12 @@ function Publishers({
       <BottomNav
         active="Proclamateurs"
         onChange={handleNavigation}
+        isAdmin={isAdmin}
       />
     </section>
   )
 }
 
 export default Publishers
+
+

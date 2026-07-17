@@ -18,6 +18,7 @@ function Inventory({
   onChangeStock,
   onDelete,
   onNavigate,
+  isAdmin = false,
 }) {
   const [selectedId, setSelectedId] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -52,6 +53,7 @@ function Inventory({
   const handleNavigation = (label) => {
     if (label === 'Accueil') onNavigate('dashboard')
     if (label === 'Publications') onNavigate('inventory')
+  if (label === 'Distribution') onNavigate('distribution')
     if (label === 'Proclamateurs') onNavigate('publishers')
     if (label === 'Assemblée') onNavigate('assemblies')
     if (label === 'Plus') onNavigate('more')
@@ -128,7 +130,7 @@ function Inventory({
     )
 
     if (cleanQuantity === 0) {
-      setFormError('Indique une quantité supérieure à zéro.')
+      setFormError('Indique une quantitÃ© supÃ©rieure Ã  zÃ©ro.')
       return
     }
 
@@ -137,7 +139,7 @@ function Inventory({
       cleanQuantity > selectedPublication.stock
     ) {
       setFormError(
-        'La quantité distribuée dépasse le stock disponible.',
+        'La quantitÃ© distribuÃ©e dÃ©passe le stock disponible.',
       )
       return
     }
@@ -165,9 +167,9 @@ function Inventory({
     if (!selectedPublication || saving) return
 
     const confirmed = window.confirm(
-      'Supprimer définitivement « ' +
+      'Supprimer dÃ©finitivement Â« ' +
         selectedPublication.name +
-        ' » ?',
+        ' Â» ?',
     )
 
     if (!confirmed) return
@@ -233,7 +235,7 @@ function Inventory({
             <h2>Aucune publication</h2>
 
             <p>
-              Les publications ajoutées apparaîtront ici.
+              Les publications ajoutÃ©es apparaÃ®tront ici.
             </p>
 
             <button
@@ -349,7 +351,7 @@ function Inventory({
                     setShowHistory(true)
                   }}
                 >
-                  Voir l’historique
+                  Voir lâ€™historique
                 </button>
 
                 <button
@@ -384,7 +386,7 @@ function Inventory({
                 </h3>
 
                 <label>
-                  Quantité
+                  QuantitÃ©
                   <input
                     type="number"
                     inputMode="numeric"
@@ -409,7 +411,7 @@ function Inventory({
                   type="submit"
                   disabled={saving}
                 >
-                  {saving ? 'Enregistrement…' : 'Valider'}
+                  {saving ? 'Enregistrementâ€¦' : 'Valider'}
                 </button>
 
                 <button
@@ -536,8 +538,8 @@ function Inventory({
                 disabled={saving}
               >
                 {saving
-                  ? 'Ajout…'
-                  : 'Ajouter à l’inventaire'}
+                  ? 'Ajoutâ€¦'
+                  : 'Ajouter Ã  lâ€™inventaire'}
               </button>
 
               <button
@@ -556,9 +558,11 @@ function Inventory({
       <BottomNav
         active="Publications"
         onChange={handleNavigation}
+        isAdmin={isAdmin}
       />
     </section>
   )
 }
 
 export default Inventory
+

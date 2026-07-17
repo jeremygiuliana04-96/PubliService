@@ -15,3 +15,4 @@ function BrandLogo({ compact = false }) {
 }
 
 export default BrandLogo
+

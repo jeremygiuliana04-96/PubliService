@@ -50,6 +50,7 @@ function Assemblies({
   const handleNavigation = (label) => {
     if (label === 'Accueil') onNavigate('dashboard')
     if (label === 'Publications') onNavigate('inventory')
+  if (label === 'Distribution') onNavigate('distribution')
     if (label === 'Proclamateurs') onNavigate('publishers')
     if (label === 'Assemblée') onNavigate('assemblies')
     if (label === 'Plus') onNavigate('more')
@@ -161,7 +162,7 @@ function Assemblies({
 
       setSelectedAssembly(nextAssembly)
       setShowEditForm(false)
-      setMessage('Nom de l’assemblée modifié.')
+      setMessage('Nom de lâ€™assemblÃ©e modifiÃ©.')
     } catch (updateError) {
       setError(updateError.message)
     } finally {
@@ -173,7 +174,7 @@ function Assemblies({
     if (!selectedAssembly || saving) return
 
     const confirmed = window.confirm(
-      'Régénérer le code d’accès ? L’ancien code ne fonctionnera plus.',
+      'RÃ©gÃ©nÃ©rer le code dâ€™accÃ¨s ? Lâ€™ancien code ne fonctionnera plus.',
     )
 
     if (!confirmed) return
@@ -200,7 +201,7 @@ function Assemblies({
       )
 
       setSelectedAssembly(updatedAssembly)
-      setMessage('Nouveau code généré.')
+      setMessage('Nouveau code gÃ©nÃ©rÃ©.')
     } catch (codeError) {
       setError(codeError.message)
     } finally {
@@ -213,13 +214,13 @@ function Assemblies({
 
     if (assemblies.length <= 1) {
       setError(
-        'Il faut conserver au moins une assemblée active.',
+        'Il faut conserver au moins une assemblÃ©e active.',
       )
       return
     }
 
     const confirmed = window.confirm(
-      `Archiver l’assemblée « ${selectedAssembly.name} » ?`,
+      `Archiver lâ€™assemblÃ©e Â« ${selectedAssembly.name} Â» ?`,
     )
 
     if (!confirmed) return
@@ -255,7 +256,7 @@ function Assemblies({
       await navigator.clipboard.writeText(
         selectedAssembly.code,
       )
-      setMessage('Code copié.')
+      setMessage('Code copiÃ©.')
     } catch {
       setError('Impossible de copier le code.')
     }
@@ -288,7 +289,7 @@ function Assemblies({
 
         {loading ? (
           <p className="empty-history">
-            Chargement des assemblées…
+            Chargement des assemblÃ©esâ€¦
           </p>
         ) : assemblies.length === 0 ? (
           <div className="publishers-empty">
@@ -296,10 +297,10 @@ function Assemblies({
               <AssemblyIcon />
             </span>
 
-            <h2>Aucune assemblée</h2>
+            <h2>Aucune assemblÃ©e</h2>
 
             <p>
-              Ajoute une assemblée pour commencer.
+              Ajoute une assemblÃ©e pour commencer.
             </p>
 
             <button
@@ -307,14 +308,13 @@ function Assemblies({
               type="button"
               onClick={openAddForm}
             >
-              Ajouter une assemblée
+              Ajouter une assemblÃ©e
             </button>
           </div>
         ) : (
           <div className="publication-list">
             {assemblies.map((assembly) => {
-              const isCurrent =
-                currentAssembly?.id === assembly.id
+              const isCurrent = assembly.isActive
 
               return (
                 <button
@@ -364,20 +364,20 @@ function Assemblies({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="sheet-handle" />
-            <h2>Nouvelle assemblée</h2>
+            <h2>Nouvelle assemblÃ©e</h2>
 
             <form
               className="publication-form"
               onSubmit={submitAssembly}
             >
               <label>
-                Nom de l’assemblée
+                Nom de lâ€™assemblÃ©e
                 <input
                   value={name}
                   onChange={(event) =>
                     setName(event.target.value)
                   }
-                  placeholder="Ex. Péronnes"
+                  placeholder="Ex. PÃ©ronnes"
                   autoFocus
                   disabled={saving}
                   required
@@ -385,7 +385,7 @@ function Assemblies({
               </label>
 
               <label>
-                Code d’accès
+                Code dâ€™accÃ¨s
                 <input
                   type="text"
                   inputMode="numeric"
@@ -398,14 +398,14 @@ function Assemblies({
                         .slice(0, 6),
                     )
                   }
-                  placeholder="Laisser vide pour générer"
+                  placeholder="Laisser vide pour gÃ©nÃ©rer"
                   disabled={saving}
                 />
               </label>
 
               <p className="form-note">
-                Si le champ reste vide, un code unique à
-                6 chiffres sera généré automatiquement.
+                Si le champ reste vide, un code unique Ã 
+                6 chiffres sera gÃ©nÃ©rÃ© automatiquement.
               </p>
 
               {error && (
@@ -420,8 +420,8 @@ function Assemblies({
                 disabled={saving}
               >
                 {saving
-                  ? 'Création…'
-                  : 'Créer l’assemblée'}
+                  ? 'CrÃ©ationâ€¦'
+                  : 'CrÃ©er lâ€™assemblÃ©e'}
               </button>
 
               <button
@@ -460,9 +460,9 @@ function Assemblies({
             </div>
 
             <div className="stock-display">
-              <small>Code d’accès</small>
+              <small>Code dâ€™accÃ¨s</small>
               <strong>
-                {selectedAssembly.code || '—'}
+                {selectedAssembly.code || 'â€”'}
               </strong>
             </div>
 
@@ -484,7 +484,7 @@ function Assemblies({
                 onSubmit={submitAssemblyName}
               >
                 <label>
-                  Nom de l’assemblée
+                  Nom de lâ€™assemblÃ©e
                   <input
                     value={name}
                     onChange={(event) =>
@@ -502,7 +502,7 @@ function Assemblies({
                   disabled={saving}
                 >
                   {saving
-                    ? 'Enregistrement…'
+                    ? 'Enregistrementâ€¦'
                     : 'Enregistrer'}
                 </button>
 
@@ -534,7 +534,7 @@ function Assemblies({
                     }}
                     disabled={saving}
                   >
-                    Définir comme active
+                    DÃ©finir comme active
                   </button>
                 )}
 
@@ -568,7 +568,7 @@ function Assemblies({
                   onClick={handleRegenerateCode}
                   disabled={saving}
                 >
-                  Régénérer le code
+                  RÃ©gÃ©nÃ©rer le code
                 </button>
 
                 <button
@@ -577,7 +577,7 @@ function Assemblies({
                   onClick={handleArchiveAssembly}
                   disabled={saving}
                 >
-                  Archiver l’assemblée
+                  Archiver lâ€™assemblÃ©e
                 </button>
 
                 <button
@@ -604,3 +604,4 @@ function Assemblies({
 }
 
 export default Assemblies
+

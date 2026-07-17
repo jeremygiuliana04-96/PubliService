@@ -32,7 +32,7 @@ function AdminLogin({ onBack, onAuthenticated }) {
     try {
       await sendPasswordReset(email)
       setMessageType('success')
-      setMessage('Un e-mail de réinitialisation vient de vous être envoyé.')
+      setMessage('Un e-mail de rÃ©initialisation vient de vous Ãªtre envoyÃ©.')
     } catch (error) {
       setMessageType('error')
       setMessage(error.message)
@@ -44,7 +44,7 @@ function AdminLogin({ onBack, onAuthenticated }) {
   return (
     <section className="phone-page form-page">
       <header className="simple-header">
-        <button className="icon-button" type="button" onClick={onBack} aria-label="Retour">←</button>
+        <button className="icon-button" type="button" onClick={onBack} aria-label="Retour">â†</button>
         <h2>Administrateur</h2>
         <span className="header-balance" />
       </header>
@@ -79,7 +79,7 @@ function AdminLogin({ onBack, onAuthenticated }) {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="••••••••"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                 autoComplete="current-password"
                 disabled={loading}
                 required
@@ -93,10 +93,10 @@ function AdminLogin({ onBack, onAuthenticated }) {
           {message && <p className={`form-message form-message--${messageType}`}>{message}</p>}
 
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? 'Connexion…' : 'Se connecter'}
+            {loading ? 'Connexionâ€¦' : 'Se connecter'}
           </button>
           <button className="text-button" type="button" onClick={resetPassword} disabled={loading}>
-            Mot de passe oublié ?
+            Mot de passe oubliÃ© ?
           </button>
         </form>
       </div>
@@ -105,3 +105,4 @@ function AdminLogin({ onBack, onAuthenticated }) {
 }
 
 export default AdminLogin
+

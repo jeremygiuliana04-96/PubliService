@@ -1,4 +1,4 @@
-function AuthLoader({ label = 'Chargement…' }) {
+function AuthLoader({ label = 'Chargementâ€¦' }) {
   return (
     <section className="phone-page auth-loader" aria-live="polite" aria-busy="true">
       <div className="auth-spinner" aria-hidden="true" />
@@ -8,3 +8,4 @@ function AuthLoader({ label = 'Chargement…' }) {
 }
 
 export default AuthLoader
+

@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase'
-import { DEFAULT_ASSEMBLY_ID } from './publicationService'
 
 const mapPublisher = (publisher) => ({
   id: publisher.id,
@@ -13,14 +12,41 @@ const mapPublisher = (publisher) => ({
   createdAt: publisher.created_at,
 })
 
-export async function getPublishers() {
-  const { data, error } = await supabase
-    .from('publishers')
-    .select('*')
-    .eq('assembly_id', DEFAULT_ASSEMBLY_ID)
-    .eq('active', true)
-    .order('last_name', { ascending: true })
-    .order('first_name', { ascending: true })
+function requireAssemblyAccess(assemblyId, accessCode) {
+  if (!assemblyId) {
+    throw new Error(
+      'Aucune assemblée n’est sélectionnée.',
+    )
+  }
+
+  const cleanCode = String(accessCode ?? '')
+    .replace(/\D/g, '')
+
+  if (cleanCode.length !== 6) {
+    throw new Error(
+      'Le code de l’assemblée est introuvable.',
+    )
+  }
+
+  return {
+    assemblyId,
+    accessCode: cleanCode,
+  }
+}
+
+export async function getPublishers(assemblyId) {
+  if (!assemblyId) {
+    throw new Error(
+      'Aucune assemblée n’est sélectionnée.',
+    )
+  }
+
+  const { data, error } = await supabase.rpc(
+    'get_assembly_publishers',
+    {
+      p_assembly_id: assemblyId,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -31,20 +57,29 @@ export async function getPublishers() {
   return (data ?? []).map(mapPublisher)
 }
 
-export async function createPublisher(publisher) {
-  const { data, error } = await supabase
-    .from('publishers')
-    .insert({
-      assembly_id: DEFAULT_ASSEMBLY_ID,
-      first_name: publisher.firstName.trim(),
-      last_name: publisher.lastName.trim(),
-      gender: publisher.gender || null,
-      phone: publisher.phone?.trim() || null,
-      email: publisher.email?.trim().toLowerCase() || null,
-      active: true,
-    })
-    .select()
-    .single()
+export async function createPublisher(
+  publisher,
+  assemblyId,
+  accessCode,
+) {
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
+  )
+
+  const { data, error } = await supabase.rpc(
+    'create_assembly_publisher',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_first_name: publisher.firstName.trim(),
+      p_last_name: publisher.lastName.trim(),
+      p_gender: publisher.gender || null,
+      p_phone: publisher.phone?.trim() || null,
+      p_email:
+        publisher.email?.trim().toLowerCase() || null,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -52,23 +87,38 @@ export async function createPublisher(publisher) {
     )
   }
 
-  return mapPublisher(data)
+  const created = Array.isArray(data)
+    ? data[0]
+    : data
+
+  return mapPublisher(created)
 }
 
-export async function updatePublisher(id, publisher) {
-  const { data, error } = await supabase
-    .from('publishers')
-    .update({
-      first_name: publisher.firstName.trim(),
-      last_name: publisher.lastName.trim(),
-      gender: publisher.gender || null,
-      phone: publisher.phone?.trim() || null,
-      email: publisher.email?.trim().toLowerCase() || null,
-    })
-    .eq('id', id)
-    .eq('assembly_id', DEFAULT_ASSEMBLY_ID)
-    .select()
-    .single()
+export async function updatePublisher(
+  id,
+  publisher,
+  assemblyId,
+  accessCode,
+) {
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
+  )
+
+  const { data, error } = await supabase.rpc(
+    'update_assembly_publisher',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_publisher_id: id,
+      p_first_name: publisher.firstName.trim(),
+      p_last_name: publisher.lastName.trim(),
+      p_gender: publisher.gender || null,
+      p_phone: publisher.phone?.trim() || null,
+      p_email:
+        publisher.email?.trim().toLowerCase() || null,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -76,15 +126,31 @@ export async function updatePublisher(id, publisher) {
     )
   }
 
-  return mapPublisher(data)
+  const updated = Array.isArray(data)
+    ? data[0]
+    : data
+
+  return mapPublisher(updated)
 }
 
-export async function deletePublisher(id) {
-  const { error } = await supabase
-    .from('publishers')
-    .update({ active: false })
-    .eq('id', id)
-    .eq('assembly_id', DEFAULT_ASSEMBLY_ID)
+export async function deletePublisher(
+  id,
+  assemblyId,
+  accessCode,
+) {
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
+  )
+
+  const { error } = await supabase.rpc(
+    'delete_assembly_publisher',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_publisher_id: id,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -92,3 +158,4 @@ export async function deletePublisher(id) {
     )
   }
 }
+

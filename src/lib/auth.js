@@ -5,7 +5,7 @@ export async function signInAdministrator(email, password) {
 
   if (!cleanEmail || !password) {
     throw new Error(
-      'Veuillez compléter l’adresse e-mail et le mot de passe.',
+      'Veuillez complÃ©ter lâ€™adresse e-mail et le mot de passe.',
     )
   }
 
@@ -25,7 +25,7 @@ export async function signInAdministrator(email, password) {
 
     if (errorMessage.includes('email not confirmed')) {
       throw new Error(
-        'Votre adresse e-mail doit encore être confirmée.',
+        'Votre adresse e-mail doit encore Ãªtre confirmÃ©e.',
       )
     }
 
@@ -46,7 +46,7 @@ export async function signOutAdministrator() {
 
   if (error) {
     throw new Error(
-      'La déconnexion a échoué. Réessayez.',
+      'La dÃ©connexion a Ã©chouÃ©. RÃ©essayez.',
     )
   }
 }
@@ -56,7 +56,7 @@ export async function sendPasswordReset(email) {
 
   if (!cleanEmail) {
     throw new Error(
-      'Indiquez d’abord votre adresse e-mail.',
+      'Indiquez dâ€™abord votre adresse e-mail.',
     )
   }
 
@@ -67,7 +67,7 @@ export async function sendPasswordReset(email) {
 
   if (error) {
     throw new Error(
-      'Impossible d’envoyer l’e-mail de réinitialisation.',
+      'Impossible dâ€™envoyer lâ€™e-mail de rÃ©initialisation.',
     )
   }
 }

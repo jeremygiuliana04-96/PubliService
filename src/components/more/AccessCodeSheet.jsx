@@ -61,7 +61,7 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
         setOriginalCode(loadedCode)
       } catch (error) {
         console.error(
-          'Chargement de l’assemblée impossible :',
+          'Chargement de lâ€™assemblÃ©e impossible :',
           error,
         )
 
@@ -104,7 +104,7 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
     setAccessCode(nextCode)
     setMessageType('success')
     setMessage(
-      'Nouveau code généré. Appuyez sur Enregistrer pour l’activer.',
+      'Nouveau code gÃ©nÃ©rÃ©. Appuyez sur Enregistrer pour lâ€™activer.',
     )
   }
 
@@ -114,10 +114,10 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
     try {
       await navigator.clipboard.writeText(accessCode)
       setMessageType('success')
-      setMessage('Code copié.')
+      setMessage('Code copiÃ©.')
     } catch {
       setMessageType('error')
-      setMessage('La copie automatique a échoué.')
+      setMessage('La copie automatique a Ã©chouÃ©.')
     }
   }
 
@@ -126,7 +126,7 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
 
     if (!cleanName) {
       setMessageType('error')
-      setMessage('Veuillez indiquer le nom de l’assemblée.')
+      setMessage('Veuillez indiquer le nom de lâ€™assemblÃ©e.')
       return
     }
 
@@ -165,10 +165,10 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
       setAssemblyName(cleanName)
       setOriginalCode(accessCode)
       setMessageType('success')
-      setMessage('Les informations ont été enregistrées.')
+      setMessage('Les informations ont Ã©tÃ© enregistrÃ©es.')
     } catch (error) {
       console.error(
-        'Enregistrement de l’assemblée impossible :',
+        'Enregistrement de lâ€™assemblÃ©e impossible :',
         error,
       )
 
@@ -208,13 +208,13 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
             disabled={saving}
             aria-label="Fermer"
           >
-            ×
+            Ã—
           </button>
         </div>
 
         {loading ? (
           <p className="assembly-loading">
-            Chargement…
+            Chargementâ€¦
           </p>
         ) : (
           <>
@@ -230,7 +230,7 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
                 onChange={(event) =>
                   setAssemblyName(event.target.value)
                 }
-                placeholder="Nom de l’assemblée"
+                placeholder="Nom de lâ€™assemblÃ©e"
                 disabled={saving}
               />
             </div>
@@ -284,7 +284,7 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
                 onClick={copyCode}
                 disabled={saving || !accessCode}
               >
-                <span aria-hidden="true">▣</span>
+                <span aria-hidden="true">â–£</span>
                 Copier
               </button>
 
@@ -294,8 +294,8 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
                 onClick={regenerateCode}
                 disabled={saving}
               >
-                <span aria-hidden="true">↻</span>
-                Régénérer
+                <span aria-hidden="true">â†»</span>
+                RÃ©gÃ©nÃ©rer
               </button>
 
               <button
@@ -304,10 +304,10 @@ function AccessCodeSheet({ open, onClose, currentAssembly }) {
                 onClick={saveAssembly}
                 disabled={saving}
               >
-                <span aria-hidden="true">✓</span>
+                <span aria-hidden="true">âœ“</span>
 
                 {saving
-                  ? 'Enregistrement…'
+                  ? 'Enregistrementâ€¦'
                   : 'Enregistrer'}
               </button>
             </div>

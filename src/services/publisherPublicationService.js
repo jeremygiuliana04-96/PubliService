@@ -1,4 +1,4 @@
-﻿import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 const mapPublisherPublication = (item) => ({
   id: item.id,
@@ -9,11 +9,46 @@ const mapPublisherPublication = (item) => ({
   createdAt: item.created_at,
 })
 
-export async function getPublisherPublications(publisherId) {
-  const { data, error } = await supabase
-    .from('publisher_publications')
-    .select('*')
-    .eq('publisher_id', publisherId)
+function requireAssemblyAccess(assemblyId, accessCode) {
+  if (!assemblyId) {
+    throw new Error(
+      'Aucune assemblée n’est sélectionnée.',
+    )
+  }
+
+  const cleanCode = String(accessCode ?? '')
+    .replace(/\D/g, '')
+
+  if (cleanCode.length !== 6) {
+    throw new Error(
+      'Le code de l’assemblée est introuvable.',
+    )
+  }
+
+  return {
+    assemblyId,
+    accessCode: cleanCode,
+  }
+}
+
+export async function getPublisherPublications(
+  publisherId,
+  assemblyId,
+  accessCode,
+) {
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
+  )
+
+  const { data, error } = await supabase.rpc(
+    'get_assembly_publisher_publications',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_publisher_id: publisherId,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -29,93 +64,48 @@ export async function savePublisherPublication({
   publicationId,
   orderedQuantity,
   distributedQuantity,
+  assemblyId,
+  accessCode,
 }) {
-  const cleanOrderedQuantity = Math.max(
-    0,
-    Number(orderedQuantity) || 0,
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
   )
 
-  const cleanDistributedQuantity = Math.max(
-    0,
-    Number(distributedQuantity) || 0,
+  const { data, error } = await supabase.rpc(
+    'save_assembly_publisher_publication',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_publisher_id: publisherId,
+      p_publication_id: publicationId,
+      p_ordered_quantity:
+        Math.max(0, Number(orderedQuantity) || 0),
+      p_distributed_quantity:
+        Math.max(0, Number(distributedQuantity) || 0),
+    },
   )
-
-  const { data: existing, error: existingError } = await supabase
-    .from('publisher_publications')
-    .select('id')
-    .eq('publisher_id', publisherId)
-    .eq('publication_id', publicationId)
-    .maybeSingle()
-
-  if (existingError) {
-    throw new Error(
-      `Impossible de vérifier la publication : ${existingError.message}`,
-    )
-  }
-
-  if (
-    cleanOrderedQuantity === 0 &&
-    cleanDistributedQuantity === 0
-  ) {
-    if (!existing) return null
-
-    const { error } = await supabase
-      .from('publisher_publications')
-      .delete()
-      .eq('id', existing.id)
-
-    if (error) {
-      throw new Error(
-        `Impossible de supprimer la publication : ${error.message}`,
-      )
-    }
-
-    return null
-  }
-
-  if (existing) {
-    const { data, error } = await supabase
-      .from('publisher_publications')
-      .update({
-        ordered_quantity: cleanOrderedQuantity,
-        distributed_quantity: cleanDistributedQuantity,
-      })
-      .eq('id', existing.id)
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(
-        `Impossible de modifier la publication : ${error.message}`,
-      )
-    }
-
-    return mapPublisherPublication(data)
-  }
-
-  const { data, error } = await supabase
-    .from('publisher_publications')
-    .insert({
-      publisher_id: publisherId,
-      publication_id: publicationId,
-      ordered_quantity: cleanOrderedQuantity,
-      distributed_quantity: cleanDistributedQuantity,
-    })
-    .select()
-    .single()
 
   if (error) {
     throw new Error(
-      `Impossible d’ajouter la publication : ${error.message}`,
+      `Impossible d’enregistrer la publication : ${error.message}`,
     )
   }
 
-  return mapPublisherPublication(data)
+  const saved = Array.isArray(data)
+    ? data[0]
+    : data
+
+  return saved
+    ? mapPublisherPublication(saved)
+    : null
 }
 
 export async function saveAllPublisherPublications(
   publisherId,
   publicationQuantities,
+  assemblyId,
+  accessCode,
 ) {
   const results = []
 
@@ -124,7 +114,10 @@ export async function saveAllPublisherPublications(
       publisherId,
       publicationId: item.publicationId,
       orderedQuantity: item.orderedQuantity,
-      distributedQuantity: item.distributedQuantity,
+      distributedQuantity:
+        item.distributedQuantity,
+      assemblyId,
+      accessCode,
     })
 
     if (result) results.push(result)
@@ -132,3 +125,4 @@ export async function saveAllPublisherPublications(
 
   return results
 }
+

@@ -8,10 +8,19 @@ import More from './pages/More'
 import AdminPanel from './pages/AdminPanel'
 import Publishers from './pages/Publishers'
 import Assemblies from './pages/Assemblies'
+import Distribution from './pages/Distribution'
 import AuthLoader from './components/AuthLoader'
 import { signOutAdministrator } from './lib/auth'
 import { supabase } from './lib/supabase'
-import { getAssemblies } from './services/assemblyService'
+import {
+  getAssemblies,
+  loginWithAssemblyCode,
+} from './services/assemblyService'
+import {
+  clearAssemblySession,
+  getAssemblySession,
+  saveAssemblySession,
+} from './lib/assemblySession'
 import {
   createPublication,
   deletePublication,
@@ -35,6 +44,13 @@ const ACTIVE_ASSEMBLY_STORAGE_KEY = 'publiservice-active-assembly-id'
 function App() {
   const [screen, setScreen] = useState('welcome')
   const [session, setSession] = useState(null)
+  const [assemblySession, setAssemblySession] = useState(
+    () => getAssemblySession(),
+  )
+  const [assemblyLoginLoading, setAssemblyLoginLoading] =
+    useState(false)
+  const [assemblyLoginError, setAssemblyLoginError] =
+    useState('')
   const [authLoading, setAuthLoading] = useState(true)
   const [assembliesLoading, setAssembliesLoading] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
@@ -65,8 +81,15 @@ function App() {
 
       const currentSession = data?.session ?? null
 
+      const savedAssemblySession = getAssemblySession()
+
       setSession(currentSession)
-      setScreen(currentSession ? 'dashboard' : 'welcome')
+      setAssemblySession(savedAssemblySession)
+      setScreen(
+        currentSession || savedAssemblySession
+          ? 'dashboard'
+          : 'welcome',
+      )
       setAuthLoading(false)
     }
 
@@ -76,8 +99,15 @@ function App() {
       (_event, nextSession) => {
         if (!active) return
 
+        const savedAssemblySession = getAssemblySession()
+
         setSession(nextSession)
-        setScreen(nextSession ? 'dashboard' : 'welcome')
+        setAssemblySession(savedAssemblySession)
+        setScreen(
+          nextSession || savedAssemblySession
+            ? 'dashboard'
+            : 'welcome',
+        )
         setAuthLoading(false)
       },
     )
@@ -110,6 +140,10 @@ function App() {
       setCurrentAssembly(nextCurrentAssembly)
 
       if (nextCurrentAssembly) {
+        await loadData(nextCurrentAssembly.id)
+      }
+
+      if (nextCurrentAssembly) {
         localStorage.setItem(
           ACTIVE_ASSEMBLY_STORAGE_KEY,
           nextCurrentAssembly.id,
@@ -128,45 +162,53 @@ function App() {
     }
   }
 
-  const loadData = async () => {
-    setDataLoading(true)
-    setDataError('')
+  const loadData = async (assemblyId) => {
+  if (!assemblyId) return
 
-    try {
-      const [
-        nextPublications,
-        nextMovements,
-        nextPublishers,
-      ] = await Promise.all([
-        getPublications(),
-        getStockMovements(),
-        getPublishers(),
-      ])
+  setDataLoading(true)
+  setDataError('')
 
-      setPublications(nextPublications)
-      setMovements(nextMovements)
-      setPublishers(nextPublishers)
-    } catch (error) {
-      setDataError(error.message)
-    } finally {
-      setDataLoading(false)
-    }
+  try {
+    const [
+      nextPublications,
+      nextMovements,
+      nextPublishers,
+    ] = await Promise.all([
+      getPublications(assemblyId),
+      getStockMovements(assemblyId),
+      getPublishers(assemblyId),
+    ])
+
+    setPublications(nextPublications)
+    setMovements(nextMovements)
+    setPublishers(nextPublishers)
+  } catch (error) {
+    setDataError(error.message)
+  } finally {
+    setDataLoading(false)
+  }
+}
+
+ useEffect(() => {
+  if (session) {
+    loadAssemblies()
+    return
   }
 
-  useEffect(() => {
-    if (!session) {
-      setAssemblies([])
-      setCurrentAssembly(null)
-      setPublications([])
-      setMovements([])
-      setPublishers([])
-      setDataError('')
-      return
-    }
+  if (assemblySession) {
+    setAssemblies([assemblySession])
+    setCurrentAssembly(assemblySession)
+    loadData(assemblySession.id)
+    return
+  }
 
-    loadAssemblies()
-    loadData()
-  }, [session])
+    setAssemblies([])
+    setCurrentAssembly(null)
+    setPublications([])
+    setMovements([])
+    setPublishers([])
+    setDataError('')
+  }, [session, assemblySession])
 
   const handleSelectAssembly = async (assembly) => {
     setCurrentAssembly(assembly)
@@ -196,11 +238,15 @@ function App() {
       Les services de données seront adaptés à l'étape suivante
       pour recevoir assembly.id. Le rechargement est déjà centralisé ici.
     */
-    await loadData()
+    await loadData(assembly.id)
   }
 
   const addPublication = async (publication) => {
-    const created = await createPublication(publication)
+    const created = await createPublication(
+      publication,
+      currentAssembly?.id,
+      currentAssembly?.code,
+    )
 
     setPublications((items) =>
       [...items, created].sort((a, b) =>
@@ -208,21 +254,21 @@ function App() {
       ),
     )
 
-    if (created.stock > 0) {
-      const movement = await createStockMovement({
-        publication: created,
-        amount: created.stock,
-        movementType: 'initial',
-      })
+    const nextMovements = await getStockMovements(
+  currentAssembly.id,
+)
 
-      setMovements((items) => [movement, ...items])
-    }
+setMovements(nextMovements)
 
     return created
   }
 
   const removePublication = async (id) => {
-    await deletePublication(id)
+    await deletePublication(
+      id,
+      currentAssembly?.id,
+      currentAssembly?.code,
+    )
 
     setPublications((items) =>
       items.filter((item) => item.id !== id),
@@ -262,6 +308,8 @@ function App() {
     const updated = await updatePublicationStock(
       publication,
       numericAmount,
+      currentAssembly?.id,
+      currentAssembly?.code,
     )
 
     try {
@@ -272,23 +320,22 @@ function App() {
           numericAmount > 0 ? 'reception' : 'distribution',
       })
 
-      setPublications((items) =>
-        items.map((item) =>
-          item.id === id ? updated : item,
-        ),
-      )
-
-      setMovements((items) => [movement, ...items])
-
-      return updated
     } catch (error) {
-      await updatePublicationStock(updated, -numericAmount)
+      await updatePublicationStock(
+        updated,
+        -numericAmount,
+        currentAssembly?.id,
+      )
       throw error
     }
   }
 
   const addPublisher = async (publisher) => {
-    const created = await createPublisher(publisher)
+    const created = await createPublisher(
+      publisher,
+      currentAssembly?.id,
+      currentAssembly?.code,
+    )
 
     setPublishers((items) =>
       [...items, created].sort((a, b) => {
@@ -310,7 +357,12 @@ function App() {
   }
 
   const editPublisher = async (id, publisher) => {
-    const updated = await updatePublisher(id, publisher)
+    const updated = await updatePublisher(
+      id,
+      publisher,
+      currentAssembly?.id,
+      currentAssembly?.code,
+    )
 
     setPublishers((items) =>
       items
@@ -336,11 +388,44 @@ function App() {
   }
 
   const removePublisher = async (id) => {
-    await deletePublisher(id)
+    await deletePublisher(
+      id,
+      currentAssembly?.id,
+      currentAssembly?.code,
+    )
 
     setPublishers((items) =>
       items.filter((item) => item.id !== id),
     )
+  }
+
+  const handleAssemblyLogin = async (code) => {
+    if (assemblyLoginLoading) return
+
+    setAssemblyLoginLoading(true)
+    setAssemblyLoginError('')
+
+    try {
+      const assembly = await loginWithAssemblyCode(code)
+      const savedSession = saveAssemblySession(assembly)
+
+      setAssemblySession(savedSession)
+      setCurrentAssembly(savedSession)
+      setAssemblies([savedSession])
+
+      localStorage.setItem(
+        ACTIVE_ASSEMBLY_STORAGE_KEY,
+        savedSession.id,
+      )
+
+      setScreen('dashboard')
+    } catch (error) {
+      setAssemblyLoginError(
+        error.message || 'Connexion impossible.',
+      )
+    } finally {
+      setAssemblyLoginLoading(false)
+    }
   }
 
   const handleAuthenticated = (nextSession) => {
@@ -354,8 +439,21 @@ function App() {
     setLogoutLoading(true)
 
     try {
-      await signOutAdministrator()
+      if (session) {
+        await signOutAdministrator()
+      }
+
+      clearAssemblySession()
+      localStorage.removeItem(ACTIVE_ASSEMBLY_STORAGE_KEY)
+
       setSession(null)
+      setAssemblySession(null)
+      setAssemblies([])
+      setCurrentAssembly(null)
+      setPublications([])
+      setMovements([])
+      setPublishers([])
+      setDataError('')
       setScreen('welcome')
     } catch (error) {
       window.alert(error.message)
@@ -372,15 +470,19 @@ function App() {
     )
   }
 
+  const isAdmin = Boolean(session)
+  const isAssembly = Boolean(assemblySession) && !isAdmin
+
   const protectedScreen =
     screen === 'dashboard' ||
     screen === 'inventory' ||
+    screen === 'distribution' ||
     screen === 'publishers' ||
     screen === 'assemblies' ||
     screen === 'more' ||
     screen === 'adminPanel'
 
-  if (protectedScreen && !session) {
+  if (protectedScreen && !session && !assemblySession) {
     return (
       <main className="app-shell">
         <AdminLogin
@@ -402,6 +504,15 @@ function App() {
     )
   }
 
+  const adminOnlyScreen =
+    screen === 'assemblies' ||
+    screen === 'adminPanel'
+
+  const visibleScreen =
+    isAssembly && adminOnlyScreen
+      ? 'dashboard'
+      : screen
+
   const screens = {
     welcome: (
       <Welcome
@@ -419,12 +530,13 @@ function App() {
 
     assembly: (
       <AssemblyLogin
-        onBack={() => setScreen('welcome')}
-        onLogin={() =>
-          window.alert(
-            'L’accès par code sera connecté à Supabase lors d’une prochaine étape.',
-          )
-        }
+        onBack={() => {
+          setAssemblyLoginError('')
+          setScreen('welcome')
+        }}
+        onLogin={handleAssemblyLogin}
+        loading={assemblyLoginLoading}
+        error={assemblyLoginError}
       />
     ),
 
@@ -436,6 +548,7 @@ function App() {
         onNavigate={setScreen}
         onLogout={handleLogout}
         logoutLoading={logoutLoading}
+        isAdmin={isAdmin}
       />
     ),
 
@@ -448,6 +561,17 @@ function App() {
         onChangeStock={changeStock}
         onDelete={removePublication}
         onNavigate={setScreen}
+        isAdmin={isAdmin}
+      />
+    ),
+
+    distribution: (
+      <Distribution
+        publishers={publishers}
+        publications={publications}
+        currentAssembly={currentAssembly}
+        onNavigate={setScreen}
+        isAdmin={isAdmin}
       />
     ),
 
@@ -460,6 +584,7 @@ function App() {
         onUpdate={editPublisher}
         onDelete={removePublisher}
         onNavigate={setScreen}
+        isAdmin={isAdmin}
       />
     ),
 
@@ -476,9 +601,11 @@ function App() {
     more: (
       <More
         currentAssembly={currentAssembly}
+        publisherCount={publishers.length}
         onNavigate={setScreen}
         onLogout={handleLogout}
         logoutLoading={logoutLoading}
+        isAdmin={isAdmin}
       />
     ),
 
@@ -500,17 +627,22 @@ function App() {
             type="button"
             onClick={async () => {
               await loadAssemblies()
-              await loadData()
+              if (currentAssembly?.id) {
+                await loadData(currentAssembly.id)
+              }
             }}
           >
             Réessayer
           </button>
         </section>
       ) : (
-        screens[screen] ?? screens.welcome
+        screens[visibleScreen] ?? screens.welcome
       )}
     </main>
   )
 }
 
 export default App
+
+
+

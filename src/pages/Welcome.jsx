@@ -42,3 +42,4 @@ function Welcome({ onAdmin, onAssembly }) {
 }
 
 export default Welcome
+

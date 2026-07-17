@@ -8,3 +8,4 @@ function StatCard({ icon, value, label, tone = 'blue', onClick }) {
   )
 }
 export default StatCard
+

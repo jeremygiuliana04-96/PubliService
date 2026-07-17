@@ -1,68 +1,51 @@
-﻿import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 export const DEFAULT_ASSEMBLY_ID =
   'be7ab216-ae11-4e65-b523-d7b9d5221199'
-
-export const DEFAULT_PUBLICATION_NAMES = [
-  'Tour de Garde d’étude',
-  'Cahier Vie et Ministère',
-]
 
 const mapPublication = (publication) => ({
   id: publication.id,
   assemblyId: publication.assembly_id,
   name: publication.name,
   stock: Number(publication.stock ?? 0),
-    createdAt: publication.created_at,
+  createdAt: publication.created_at,
 })
 
-export async function ensureDefaultPublications() {
-  const { data: existing, error: loadError } = await supabase
-    .from('publications')
-    .select('*')
-    .eq('assembly_id', DEFAULT_ASSEMBLY_ID)
-
-  if (loadError) {
+function requireAssemblyAccess(assemblyId, accessCode) {
+  if (!assemblyId) {
     throw new Error(
-      `Impossible de vérifier les publications : ${loadError.message}`,
+      'Aucune assemblée n’est sélectionnée.',
     )
   }
 
-  const existingNames = new Set(
-    (existing ?? []).map((item) => item.name.trim().toLowerCase()),
-  )
+  const cleanCode = String(accessCode ?? '')
+    .replace(/\D/g, '')
 
-  const missingNames = DEFAULT_PUBLICATION_NAMES.filter(
-    (name) => !existingNames.has(name.toLowerCase()),
-  )
+  if (cleanCode.length !== 6) {
+    throw new Error(
+      'Le code de l’assemblée est introuvable.',
+    )
+  }
 
-  if (missingNames.length > 0) {
-    const { error: insertError } = await supabase
-      .from('publications')
-      .insert(
-        missingNames.map((name) => ({
-          assembly_id: DEFAULT_ASSEMBLY_ID,
-          name,
-          stock: 0,
-        })),
-      )
-
-    if (insertError) {
-      throw new Error(
-        `Impossible de créer les publications principales : ${insertError.message}`,
-      )
-    }
+  return {
+    assemblyId,
+    accessCode: cleanCode,
   }
 }
 
-export async function getPublications() {
-  await ensureDefaultPublications()
+export async function getPublications(assemblyId) {
+  if (!assemblyId) {
+    throw new Error(
+      'Aucune assemblée n’est sélectionnée.',
+    )
+  }
 
-  const { data, error } = await supabase
-    .from('publications')
-    .select('*')
-    .eq('assembly_id', DEFAULT_ASSEMBLY_ID)
-    .order('name', { ascending: true })
+  const { data, error } = await supabase.rpc(
+    'get_assembly_publications',
+    {
+      p_assembly_id: assemblyId,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -73,16 +56,28 @@ export async function getPublications() {
   return (data ?? []).map(mapPublication)
 }
 
-export async function createPublication(publication) {
-  const { data, error } = await supabase
-    .from('publications')
-    .insert({
-      assembly_id: DEFAULT_ASSEMBLY_ID,
-      name: publication.name.trim(),
-      stock: Math.max(0, Number(publication.stock) || 0),
-    })
-    .select()
-    .single()
+export async function createPublication(
+  publication,
+  assemblyId,
+  accessCode,
+) {
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
+  )
+
+  const { data, error } = await supabase.rpc(
+    'create_assembly_publication',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_name: publication.name.trim(),
+      p_stock: Math.max(
+        0,
+        Number(publication.stock) || 0,
+      ),
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -90,26 +85,39 @@ export async function createPublication(publication) {
     )
   }
 
-  return mapPublication(data)
-}
+  const created = Array.isArray(data)
+    ? data[0]
+    : data
 
-export async function updatePublicationStock(publication, amount) {
-  const nextStock =
-    Number(publication.stock ?? 0) + Number(amount ?? 0)
-
-  if (nextStock < 0) {
-    throw new Error('Le stock ne peut pas être négatif.')
+  if (!created) {
+    throw new Error(
+      'La publication n’a pas pu être créée.',
+    )
   }
 
-  const { data, error } = await supabase
-    .from('publications')
-    .update({
-      stock: nextStock,
-    })
-    .eq('id', publication.id)
-    .eq('assembly_id', DEFAULT_ASSEMBLY_ID)
-    .select()
-    .single()
+  return mapPublication(created)
+}
+
+export async function updatePublicationStock(
+  publication,
+  amount,
+  assemblyId,
+  accessCode,
+) {
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
+  )
+
+  const { data, error } = await supabase.rpc(
+    'change_assembly_publication_stock',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_publication_id: publication.id,
+      p_amount: Number(amount) || 0,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -117,34 +125,37 @@ export async function updatePublicationStock(publication, amount) {
     )
   }
 
-  return mapPublication(data)
+  const updated = Array.isArray(data)
+    ? data[0]
+    : data
+
+  if (!updated) {
+    throw new Error(
+      'Le stock n’a pas pu être modifié.',
+    )
+  }
+
+  return mapPublication(updated)
 }
 
+export async function deletePublication(
+  id,
+  assemblyId,
+  accessCode,
+) {
+  const access = requireAssemblyAccess(
+    assemblyId,
+    accessCode,
+  )
 
-
-export async function deletePublication(id) {
-  const { count, error: countError } = await supabase
-    .from('publisher_publications')
-    .select('id', { count: 'exact', head: true })
-    .eq('publication_id', id)
-
-  if (countError) {
-    throw new Error(
-      `Impossible de vérifier la publication : ${countError.message}`,
-    )
-  }
-
-  if ((count ?? 0) > 0) {
-    throw new Error(
-      'Cette publication est encore attribuée à un ou plusieurs proclamateurs.',
-    )
-  }
-
-  const { error } = await supabase
-    .from('publications')
-    .delete()
-    .eq('id', id)
-    .eq('assembly_id', DEFAULT_ASSEMBLY_ID)
+  const { error } = await supabase.rpc(
+    'delete_assembly_publication',
+    {
+      p_assembly_id: access.assemblyId,
+      p_code: access.accessCode,
+      p_publication_id: id,
+    },
+  )
 
   if (error) {
     throw new Error(
@@ -152,3 +163,4 @@ export async function deletePublication(id) {
     )
   }
 }
+
