@@ -6,7 +6,10 @@ import {
 
 function Chevron() {
   return (
-    <span className="more-chevron" aria-hidden="true">
+    <span
+      className="more-chevron"
+      aria-hidden="true"
+    >
       ›
     </span>
   )
@@ -23,7 +26,7 @@ function More({
   const handleNavigation = (label) => {
     if (label === 'Accueil') onNavigate('dashboard')
     if (label === 'Publications') onNavigate('inventory')
-    if (label === 'Distribution') onNavigate('distribution')
+  if (label === 'Distribution') onNavigate('distribution')
     if (label === 'Proclamateurs') onNavigate('publishers')
     if (label === 'Plus') onNavigate('more')
   }
@@ -39,7 +42,10 @@ function More({
           <h1>Plus</h1>
         </div>
 
-        <span className="more-header-icon" aria-hidden="true">
+        <span
+          className="more-header-icon"
+          aria-hidden="true"
+        >
           <SettingsIcon />
         </span>
       </header>
@@ -62,13 +68,19 @@ function More({
                 <>
                   <small>
                     Statut :{' '}
-                    {currentAssembly?.isActive ? 'Active' : 'Inactive'}
+                    {currentAssembly?.isActive
+                      ? 'Active'
+                      : 'Inactive'}
                   </small>
-                  <small>Proclamateurs : {publisherCount}</small>
+
+                  <small>
+                    Proclamateurs : {publisherCount}
+                  </small>
                 </>
               ) : null}
             </span>
           </div>
+
         </section>
 
         {isAdmin ? (
@@ -78,52 +90,17 @@ function More({
             <button
               className="more-row"
               type="button"
-              onClick={() => onNavigate('assemblies')}
-            >
-              <span className="more-row-icon" aria-hidden="true">
-                🏛️
-              </span>
-
-              <span className="more-row-text">
-                <strong>Assemblées</strong>
-                <small>Créer et gérer les assemblées</small>
-              </span>
-
-              <Chevron />
-            </button>
-
-            <button
-              className="more-row"
-              type="button"
               onClick={() => onNavigate('adminPanel')}
             >
-              <span
-                className="more-row-icon more-row-icon--users"
-                aria-hidden="true"
-              >
+              <span className="more-row-icon more-row-icon--users">
                 👤
               </span>
 
               <span className="more-row-text">
                 <strong>Administrateurs</strong>
-                <small>Inviter et gérer les administrateurs</small>
-              </span>
-
-              <Chevron />
-            </button>
-
-            <button
-              className="more-row"
-              type="button"
-              onClick={() => onNavigate('assemblies')}
-            >
-              <span className="more-row-icon" aria-hidden="true">
-                🔑
-              </span>
-
-              <span className="more-row-text">
-                <strong>Codes d’accès</strong>
-                <small>Attribuer et gérer les codes d’assemblée</small>
+                <small>
+                  Gérer les accès administrateurs
+                </small>
               </span>
 
               <Chevron />
@@ -140,17 +117,17 @@ function More({
             onClick={onLogout}
             disabled={logoutLoading}
           >
-            <span
-              className="more-row-icon more-row-icon--logout"
-              aria-hidden="true"
-            >
+            <span className="more-row-icon more-row-icon--logout">
               ↪
             </span>
 
             <span className="more-row-text">
               <strong>
-                {logoutLoading ? 'Déconnexion…' : 'Se déconnecter'}
+                {logoutLoading
+                  ? 'Déconnexion…'
+                  : 'Se déconnecter'}
               </strong>
+
               <small>Revenir à l’écran d’accueil</small>
             </span>
           </button>
@@ -167,3 +144,5 @@ function More({
 }
 
 export default More
+
+

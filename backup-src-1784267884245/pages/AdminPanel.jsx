@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { DEFAULT_ASSEMBLY_ID } from '../services/publicationService'
 
 function AdminIcon() {
   return (
@@ -38,57 +37,25 @@ function MailIcon() {
 }
 
 function AdminPanel({ onBack }) {
-  const [admins, setAdmins] = useState([])
   const [email, setEmail] = useState('')
-  const [loadingAdmins, setLoadingAdmins] = useState(true)
-  const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-
-  const loadAdmins = async () => {
-    setLoadingAdmins(true)
-
-    try {
-      const { data, error: loadError } = await supabase.rpc(
-        'get_assembly_admins',
-        {
-          p_assembly_id: DEFAULT_ASSEMBLY_ID,
-        },
-      )
-
-      if (loadError) throw loadError
-
-      setAdmins(data ?? [])
-    } catch (loadError) {
-      console.error('Chargement des administrateurs impossible :', loadError)
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : 'Impossible de charger les administrateurs.',
-      )
-    } finally {
-      setLoadingAdmins(false)
-    }
-  }
-
-  useEffect(() => {
-    loadAdmins()
-  }, [])
 
   const handleInvite = async (event) => {
     event.preventDefault()
 
-    const cleanEmail = email.trim().toLowerCase()
-
     setMessage('')
     setError('')
+
+    const cleanEmail = email.trim().toLowerCase()
 
     if (!cleanEmail) {
       setError('Veuillez entrer une adresse e-mail.')
       return
     }
 
-    setSending(true)
+    setLoading(true)
 
     try {
       const { data, error: functionError } =
@@ -98,32 +65,32 @@ function AdminPanel({ onBack }) {
           },
         })
 
-      if (functionError) throw functionError
+      if (functionError) {
+        throw functionError
+      }
 
       if (!data?.success) {
         throw new Error(
-          data?.error || "Impossible d’envoyer l’invitation.",
+          data?.error || "Impossible dâ€™envoyer lâ€™invitation.",
         )
       }
 
       setMessage(
-        data.message || 'Invitation envoyée avec succès.',
+        data.message || 'Invitation envoyÃ©e avec succÃ¨s.',
       )
       setEmail('')
-      await loadAdmins()
     } catch (inviteError) {
       console.error(inviteError)
+
       setError(
         inviteError instanceof Error
           ? inviteError.message
           : 'Une erreur est survenue.',
       )
     } finally {
-      setSending(false)
+      setLoading(false)
     }
   }
-
-  const busy = sending || loadingAdmins
 
   return (
     <section className="phone-page admin-panel-page">
@@ -133,9 +100,9 @@ function AdminPanel({ onBack }) {
           type="button"
           onClick={onBack}
           aria-label="Retour"
-          disabled={sending}
+          disabled={loading}
         >
-          ←
+          â†
         </button>
 
         <div>
@@ -155,12 +122,11 @@ function AdminPanel({ onBack }) {
           </span>
 
           <div className="admin-invite-heading">
-            <p>Accès administrateur</p>
+            <p>AccÃ¨s administrateur</p>
             <h2>Inviter un administrateur</h2>
             <span>
-              Envoyez une invitation à un nouvel administrateur. Il
-              pourra gérer les assemblées, les publications et les
-              codes d’accès de PubliService.
+              La personne invitÃ©e pourra gÃ©rer les assemblÃ©es,
+              les publications et les accÃ¨s de PubliService.
             </span>
           </div>
 
@@ -176,10 +142,12 @@ function AdminPanel({ onBack }) {
                   id="admin-email"
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
                   placeholder="exemple@adresse.be"
                   autoComplete="email"
-                  disabled={sending}
+                  disabled={loading}
                   required
                 />
               </span>
@@ -200,72 +168,23 @@ function AdminPanel({ onBack }) {
             <button
               type="submit"
               className="primary-button admin-invite-submit"
-              disabled={sending}
+              disabled={loading}
             >
-              {sending
-                ? 'Envoi en cours…'
-                : "Envoyer l’invitation"}
+              {loading
+                ? 'Envoi en coursâ€¦'
+                : "Envoyer lâ€™invitation"}
             </button>
           </form>
         </section>
 
         <p className="admin-invite-note">
-          L’invitation sera envoyée à l’adresse indiquée. Le nouvel
-          administrateur pourra ensuite définir son mot de passe.
+          Lâ€™invitation sera envoyÃ©e Ã  lâ€™adresse indiquÃ©e. Le nouvel
+          administrateur pourra ensuite dÃ©finir son mot de passe.
         </p>
-
-        <section className="admin-invite-card">
-          <div className="admin-invite-heading">
-            <p>Équipe actuelle</p>
-            <h2>
-              Administrateurs
-              {!loadingAdmins ? ` (${admins.length})` : ''}
-            </h2>
-            <span>
-              Les comptes ci-dessous disposent d’un accès
-              administrateur à l’assemblée.
-            </span>
-          </div>
-
-          {loadingAdmins ? (
-            <p className="empty-history">Chargement…</p>
-          ) : admins.length === 0 ? (
-            <p className="empty-history">
-              Aucun administrateur trouvé.
-            </p>
-          ) : (
-            <div className="publication-history">
-              {admins.map((admin) => (
-                <article className="history-row" key={admin.user_id}>
-                  <span className="history-amount history-amount--positive">
-                    {admin.is_current_user ? 'Vous' : 'Admin'}
-                  </span>
-
-                  <div>
-                    <strong>{admin.email}</strong>
-                    <small>
-                      {admin.is_current_user
-                        ? 'Compte actuellement connecté'
-                        : 'Administrateur de l’assemblée'}
-                    </small>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-
-          <button
-            className="sheet-close"
-            type="button"
-            onClick={loadAdmins}
-            disabled={busy}
-          >
-            {loadingAdmins ? 'Actualisation…' : 'Actualiser la liste'}
-          </button>
-        </section>
       </div>
     </section>
   )
 }
 
 export default AdminPanel
+

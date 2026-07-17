@@ -11,38 +11,6 @@ const formatMovementDate = (value) =>
     minute: '2-digit',
   }).format(new Date(value))
 
-const PUBLICATIONS = [
-  "Tour de garde d'étude",
-  'Cahier de vie et ministère',
-  'Demande spécifique',
-]
-
-const LANGUAGES = [
-  'Français',
-  'Français (Grands caractères)',
-  'Néerlandais',
-  'Anglais',
-  'Espagnol',
-  'Italien',
-]
-
-const MONTHS = [
-  { value: '01', label: 'Janvier' },
-  { value: '02', label: 'Février' },
-  { value: '03', label: 'Mars' },
-  { value: '04', label: 'Avril' },
-  { value: '05', label: 'Mai' },
-  { value: '06', label: 'Juin' },
-  { value: '07', label: 'Juillet' },
-  { value: '08', label: 'Août' },
-  { value: '09', label: 'Septembre' },
-  { value: '10', label: 'Octobre' },
-  { value: '11', label: 'Novembre' },
-  { value: '12', label: 'Décembre' },
-]
-
-const YEARS = Array.from({ length: 25 }, (_, index) => 2026 + index)
-
 function Inventory({
   publications = [],
   movements = [],
@@ -58,11 +26,7 @@ function Inventory({
   const [quantity, setQuantity] = useState('')
   const [showHistory, setShowHistory] = useState(false)
 
-  const [publicationType, setPublicationType] = useState('')
-  const [specificRequest, setSpecificRequest] = useState('')
-  const [publicationLanguage, setPublicationLanguage] = useState('')
-  const [publicationMonth, setPublicationMonth] = useState('')
-  const [publicationYear, setPublicationYear] = useState('2026')
+  const [name, setName] = useState('')
   const [initialStock, setInitialStock] = useState('')
 
   const [saving, setSaving] = useState(false)
@@ -96,11 +60,7 @@ function Inventory({
   }
 
   const resetAddForm = () => {
-    setPublicationType('')
-    setSpecificRequest('')
-    setPublicationLanguage('')
-    setPublicationMonth('')
-    setPublicationYear('2026')
+    setName('')
     setInitialStock('')
     setFormError('')
   }
@@ -133,42 +93,13 @@ function Inventory({
   const submitPublication = async (event) => {
     event.preventDefault()
 
-    if (saving) return
-
-    const cleanSpecificRequest = specificRequest.trim()
-
-    if (
-      !publicationType ||
-      (publicationType === 'Demande spécifique' && !cleanSpecificRequest) ||
-      !publicationLanguage ||
-      !publicationMonth ||
-      !publicationYear
-    ) {
-      setFormError('Complète tous les champs de la publication.')
-      return
-    }
-
-    const monthNumber = String(publicationMonth).padStart(2, '0')
-    const publicationName =
-      publicationType === 'Demande spécifique'
-        ? cleanSpecificRequest
-        : publicationType
-    const cleanName = `${publicationName} - ${publicationLanguage} - ${monthNumber}/${publicationYear}`
+    const cleanName = name.trim()
     const cleanStock = Math.max(
       0,
       Number(initialStock) || 0,
     )
 
-    const alreadyExists = publications.some(
-      (publication) =>
-        publication.name.trim().toLocaleLowerCase('fr') ===
-        cleanName.toLocaleLowerCase('fr'),
-    )
-
-    if (alreadyExists) {
-      setFormError('Cette publication existe déjà pour ce mois et cette année.')
-      return
-    }
+    if (!cleanName || saving) return
 
     setSaving(true)
     setFormError('')
@@ -199,7 +130,7 @@ function Inventory({
     )
 
     if (cleanQuantity === 0) {
-      setFormError('Indique une quantité supérieure à zéro.')
+      setFormError('Indique une quantitÃ© supÃ©rieure Ã  zÃ©ro.')
       return
     }
 
@@ -208,7 +139,7 @@ function Inventory({
       cleanQuantity > selectedPublication.stock
     ) {
       setFormError(
-        'La quantité distribuée dépasse le stock disponible.',
+        'La quantitÃ© distribuÃ©e dÃ©passe le stock disponible.',
       )
       return
     }
@@ -236,9 +167,9 @@ function Inventory({
     if (!selectedPublication || saving) return
 
     const confirmed = window.confirm(
-      'Supprimer définitivement « ' +
+      'Supprimer dÃ©finitivement Â« ' +
         selectedPublication.name +
-        ' » ?',
+        ' Â» ?',
     )
 
     if (!confirmed) return
@@ -304,7 +235,7 @@ function Inventory({
             <h2>Aucune publication</h2>
 
             <p>
-              Les publications ajoutées apparaîtront ici.
+              Les publications ajoutÃ©es apparaÃ®tront ici.
             </p>
 
             <button
@@ -420,7 +351,7 @@ function Inventory({
                     setShowHistory(true)
                   }}
                 >
-                  Voir l’historique
+                  Voir lâ€™historique
                 </button>
 
                 <button
@@ -455,7 +386,7 @@ function Inventory({
                 </h3>
 
                 <label>
-                  Quantité
+                  QuantitÃ©
                   <input
                     type="number"
                     inputMode="numeric"
@@ -480,7 +411,7 @@ function Inventory({
                   type="submit"
                   disabled={saving}
                 >
-                  {saving ? 'Enregistrement…' : 'Valider'}
+                  {saving ? 'Enregistrementâ€¦' : 'Valider'}
                 </button>
 
                 <button
@@ -567,105 +498,21 @@ function Inventory({
               onSubmit={submitPublication}
             >
               <label>
-                Choisissez votre publication
-                <select
-                  value={publicationType}
-                  onChange={(event) => {
-                    const nextType = event.target.value
-                    setPublicationType(nextType)
-
-                    if (nextType !== 'Demande spécifique') {
-                      setSpecificRequest('')
-                    }
-                  }}
+                Nom de la publication
+                <input
+                  value={name}
+                  onChange={(event) =>
+                    setName(event.target.value)
+                  }
+                  placeholder="Ex. Brochure"
                   autoFocus
                   disabled={saving}
                   required
-                >
-                  <option value="">Sélectionner une publication</option>
-                  {PUBLICATIONS.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
 
-              {publicationType === 'Demande spécifique' && (
-                <label>
-                  Précisez votre demande
-                  <input
-                    value={specificRequest}
-                    onChange={(event) =>
-                      setSpecificRequest(event.target.value)
-                    }
-                    placeholder="Ex. Brochure spéciale"
-                    disabled={saving}
-                    required
-                  />
-                </label>
-              )}
-
               <label>
-                Langue / format
-                <select
-                  value={publicationLanguage}
-                  onChange={(event) =>
-                    setPublicationLanguage(event.target.value)
-                  }
-                  disabled={saving}
-                  required
-                >
-                  <option value="">Sélectionner une langue</option>
-                  {LANGUAGES.map((language) => (
-                    <option key={language} value={language}>
-                      {language}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="publication-period-fields">
-                <label>
-                  Mois
-                  <select
-                    value={publicationMonth}
-                    onChange={(event) =>
-                      setPublicationMonth(event.target.value)
-                    }
-                    disabled={saving}
-                    required
-                  >
-                    <option value="">Mois</option>
-                    {MONTHS.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Année
-                  <select
-                    value={publicationYear}
-                    onChange={(event) =>
-                      setPublicationYear(event.target.value)
-                    }
-                    disabled={saving}
-                    required
-                  >
-                    {YEARS.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label>
-                Quantité commandée
+                Stock initial
                 <input
                   value={initialStock}
                   onChange={(event) =>
@@ -679,22 +526,6 @@ function Inventory({
                 />
               </label>
 
-              {publicationType &&
-                publicationLanguage &&
-                publicationMonth && (
-                  <p className="publication-preview">
-                    <span>Aperçu</span>
-                    <strong>
-                      {publicationType === 'Demande spécifique'
-                        ? specificRequest.trim() || 'Demande spécifique'
-                        : publicationType}{' '}
-                      - {publicationLanguage} -{' '}
-                      {String(publicationMonth).padStart(2, '0')}/
-                      {publicationYear}
-                    </strong>
-                  </p>
-                )}
-
               {formError && (
                 <p className="form-message form-message--error">
                   {formError}
@@ -707,8 +538,8 @@ function Inventory({
                 disabled={saving}
               >
                 {saving
-                  ? 'Ajout…'
-                  : 'Créer la publication'}
+                  ? 'Ajoutâ€¦'
+                  : 'Ajouter Ã  lâ€™inventaire'}
               </button>
 
               <button

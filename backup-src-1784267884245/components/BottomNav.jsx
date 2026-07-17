@@ -1,6 +1,7 @@
 import {
   HomeIcon,
   BookIcon,
+  AssemblyIcon,
   SettingsIcon,
 } from './Icons'
 
@@ -23,35 +24,37 @@ function PeopleIcon() {
   )
 }
 
-function DistributionIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z" />
-      <path d="M3 7.5V16l9 5 9-5V7.5" />
-      <path d="M12 12v9" />
-    </svg>
-  )
-}
-
-function BottomNav({ active = 'Accueil', onChange }) {
+function BottomNav({
+  active = 'Accueil',
+  onChange,
+  isAdmin = false,
+}) {
   const items = [
     ['Accueil', <HomeIcon key="home" />],
     ['Publications', <BookIcon key="book" />],
-    ['Distribution', <DistributionIcon key="distribution" />],
+    ['Distribution', <BookIcon key="distribution" />],
     ['Proclamateurs', <PeopleIcon key="people" />],
-    ['Plus', <SettingsIcon key="settings" />],
   ]
 
+  if (isAdmin) {
+    items.push([
+      'Assemblée',
+      <AssemblyIcon key="assembly" />,
+    ])
+  }
+
+  items.push([
+    'Plus',
+    <SettingsIcon key="settings" />,
+  ])
+
   return (
-    <nav className="bottom-nav" aria-label="Navigation principale">
+    <nav
+      className={`bottom-nav ${
+        isAdmin ? 'bottom-nav--admin' : ''
+      }`}
+      aria-label="Navigation principale"
+    >
       {items.map(([label, icon]) => (
         <button
           key={label}
@@ -68,3 +71,4 @@ function BottomNav({ active = 'Accueil', onChange }) {
 }
 
 export default BottomNav
+

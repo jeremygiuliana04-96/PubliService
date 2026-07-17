@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import BottomNav from '../components/BottomNav'
 import {
   getPublisherPublications,
@@ -148,29 +148,6 @@ function Publishers({
       setLoadingDetails(false)
     }
   }
-
-
-  useEffect(() => {
-    const publisherId = sessionStorage.getItem(
-      'publiservice-open-publisher',
-    )
-
-    if (!publisherId || publishers.length === 0) return
-
-    const publisher = publishers.find(
-      (item) => String(item.id) === String(publisherId),
-    )
-
-    if (!publisher) return
-
-    sessionStorage.removeItem(
-      'publiservice-open-publisher',
-    )
-
-    openEditForm(publisher)
-    // Ouverture demandee depuis Distribution uniquement.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [publishers])
 
   const closeForm = () => {
     if (saving) return

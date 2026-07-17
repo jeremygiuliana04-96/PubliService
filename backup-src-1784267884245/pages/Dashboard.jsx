@@ -53,7 +53,7 @@ function Dashboard({
         <div className="dashboard-topline">
           <div>
             <p className="app-name">PubliService</p>
-            <p>Assemblée de {currentAssembly?.name ?? '—'}</p>
+            <p>Assemblée de {currentAssembly?.name ?? 'â€”'}</p>
           </div>
           <button className="header-icon" type="button" aria-label="Notifications"><BellIcon /></button>
         </div>
@@ -61,7 +61,7 @@ function Dashboard({
       </header>
 
       <div className="dashboard-content dashboard-content--compact">
-        <section className="stats-grid" aria-label="Résumé">
+        <section className="stats-grid" aria-label="RÃ©sumÃ©">
           <StatCard icon={<BookIcon />} value={publications.length} label="Publications" onClick={() => onNavigate('inventory')} />
           <StatCard icon={<BoxIcon />} value={lowStock} label="Stock faible" tone="warning" onClick={() => onNavigate('inventory')} />
           <StatCard icon={<SendIcon />} value={distributed} label="Distribuées" tone="green" />
@@ -74,7 +74,7 @@ function Dashboard({
           </div>
           <div className="activity-list">
             {recentMovements.length === 0 ? (
-              <div className="empty-history">Aucun mouvement enregistré pour le moment.</div>
+              <div className="empty-history">Aucun mouvement enregistrÃ© pour le moment.</div>
             ) : recentMovements.map((item) => (
               <article className="activity-item" key={item.id}>
                 <div className={`activity-badge activity-badge--${item.amount > 0 ? 'positive' : 'negative'}`}>
