@@ -277,7 +277,16 @@ function Distribution({
             </p>
           </div>
         ) : (
-          <div className="publication-list">
+          <div
+            className="publication-list"
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit, minmax(min(100%, 360px), 1fr))',
+              gap: 16,
+              alignItems: 'stretch',
+            }}
+          >
             {filteredPublishers.map((publisher) => {
               const selectableRows = publisher.rows.filter(
                 (row) =>
@@ -304,6 +313,10 @@ function Distribution({
                   style={{
                     alignItems: 'flex-start',
                     padding: 18,
+                    minWidth: 0,
+                    width: '100%',
+                    height: '100%',
+                    overflow: 'hidden',
                   }}
                 >
                   <div
@@ -391,8 +404,21 @@ function Distribution({
                               }}
                             />
 
-                            <span>
-                              <strong>
+                            <span
+                              style={{
+                                minWidth: 0,
+                                flex: 1,
+                              }}
+                            >
+                              <strong
+                                style={{
+                                  display: 'block',
+                                  minWidth: 0,
+                                  overflowWrap: 'anywhere',
+                                  wordBreak: 'break-word',
+                                  lineHeight: 1.3,
+                                }}
+                              >
                                 {row.publicationName}
                               </strong>
 
@@ -441,6 +467,8 @@ function Distribution({
                           cursor: saving
                             ? 'default'
                             : 'pointer',
+                          boxSizing: 'border-box',
+                          maxWidth: '100%',
                         }}
                       >
                         {allSelected
