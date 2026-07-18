@@ -1053,3 +1053,195 @@ button { -webkit-tap-highlight-color: transparent; }
   text-align: center;
   font-weight: 700;
 }
+
+/* V6 — mise en page tablette / iPad
+   Les règles ci-dessous ne s'appliquent qu'à partir de 768 px.
+   L'affichage iPhone reste donc inchangé. */
+@media (min-width: 768px) {
+  .app-shell {
+    align-items: stretch;
+    padding: 24px;
+  }
+
+  .phone-page {
+    width: min(100%, 980px);
+    min-height: calc(100svh - 48px);
+    border-radius: 30px;
+  }
+
+  .dashboard-page,
+  .inventory-page,
+  .publishers-page,
+  .more-page,
+  .admin-panel-page {
+    min-height: calc(100svh - 48px);
+  }
+
+  .dashboard-header,
+  .inventory-header,
+  .more-header,
+  .admin-panel-header {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  .dashboard-content,
+  .inventory-content,
+  .publishers-content,
+  .more-content,
+  .admin-panel-content {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .dashboard-content {
+    padding-bottom: 110px;
+  }
+
+  .inventory-content,
+  .publishers-content,
+  .more-content {
+    padding-bottom: 112px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .quick-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .publication-list,
+  .publisher-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .publication-card,
+  .publisher-card {
+    min-height: 78px;
+  }
+
+  .publisher-search {
+    max-width: 560px;
+  }
+
+  .more-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 22px;
+  }
+
+  .more-section {
+    margin-bottom: 0;
+  }
+
+  .admin-panel-content {
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .admin-invite-card {
+    padding: 32px;
+  }
+
+  .sheet-backdrop {
+    position: fixed;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .detail-sheet,
+  .assembly-settings-sheet,
+  .publisher-detail-sheet {
+    width: min(720px, calc(100vw - 48px));
+    max-height: calc(100svh - 48px);
+    margin: 0;
+    padding: 18px 28px 30px;
+    border-radius: 28px;
+  }
+
+  .sheet-handle {
+    display: none;
+  }
+
+  .detail-sheet > h2 {
+    margin-top: 4px;
+  }
+
+  .publisher-identity-grid,
+  .publication-period-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .publisher-preference-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .publisher-preference-group {
+    height: 100%;
+  }
+
+  .publication-form {
+    gap: 16px;
+  }
+
+  .bottom-nav {
+    left: 50%;
+    width: min(100%, 980px);
+    transform: translateX(-50%);
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .bottom-nav small {
+    font-size: 10px;
+  }
+
+  .welcome-page,
+  .form-page {
+    width: min(100%, 620px);
+    align-self: center;
+    margin: auto;
+  }
+
+  .welcome-actions,
+  .login-form {
+    max-width: 520px;
+  }
+
+  .form-content {
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 1100px) {
+  .phone-page {
+    width: min(100%, 1180px);
+  }
+
+  .publication-list,
+  .publisher-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .bottom-nav {
+    width: min(100%, 1180px);
+  }
+
+  .dashboard-content,
+  .inventory-content,
+  .publishers-content,
+  .more-content {
+    padding-left: 36px;
+    padding-right: 36px;
+  }
+}
+
