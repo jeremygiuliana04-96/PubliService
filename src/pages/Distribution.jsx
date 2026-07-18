@@ -13,7 +13,7 @@ function Distribution({
   isAdmin = false,
 }) {
   const [search, setSearch] = useState('')
-  const [checked, setChecked] = useState({})
+  const [publisherRows, setPublisherRows] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -57,24 +57,28 @@ function Distribution({
 
             return {
               publisherId: publisher.id,
-              rows: rows ?? [],
+              rows: (rows ?? []).filter(
+                (row) => Number(row.orderedQuantity ?? 0) > 0,
+              ),
             }
           }),
         )
 
         if (cancelled) return
 
-        const values = {}
+        const nextPublisherRows = {}
 
         results.forEach(({ publisherId, rows }) => {
-          rows.forEach((row) => {
-            values[
-              `${publisherId}-${row.publicationId}`
-            ] = row.distributedQuantity > 0
-          })
+          nextPublisherRows[publisherId] = rows.map((row) => ({
+            publicationId: row.publicationId,
+            orderedQuantity: Number(row.orderedQuantity ?? 0),
+            distributedQuantity: Number(
+              row.distributedQuantity ?? 0,
+            ),
+          }))
         })
 
-        setChecked(values)
+        setPublisherRows(nextPublisherRows)
       } catch (error) {
         console.error(
           'Erreur lors du chargement de la distribution :',
@@ -101,28 +105,72 @@ function Distribution({
     }
   }, [publishers, assemblyId, accessCode])
 
+  const publicationById = useMemo(
+    () =>
+      Object.fromEntries(
+        publications.map((publication) => [
+          String(publication.id),
+          publication,
+        ]),
+      ),
+    [publications],
+  )
+
   const filteredPublishers = useMemo(() => {
-    const value = search.toLowerCase().trim()
+    const value = search.toLocaleLowerCase('fr').trim()
 
-    if (!value) return publishers
+    return publishers.filter((publisher) => {
+      const rows = publisherRows[publisher.id] ?? []
 
-    return publishers.filter((publisher) =>
-      `${publisher.firstName ?? ''} ${
-        publisher.lastName ?? ''
-      }`
-        .toLowerCase()
-        .includes(value),
-    )
-  }, [publishers, search])
+      if (rows.length === 0) return false
 
-  const handleCheckboxChange = (
-    publisherId,
-    publicationId,
-    isChecked,
-  ) => {
-    setChecked((previous) => ({
+      if (!value) return true
+
+      const fullName =
+        `${publisher.firstName ?? ''} ${publisher.lastName ?? ''}`
+          .trim()
+          .toLocaleLowerCase('fr')
+
+      return fullName.includes(value)
+    })
+  }, [publishers, publisherRows, search])
+
+  const togglePublication = (publisherId, publicationId) => {
+    setPublisherRows((previous) => {
+      const rows = previous[publisherId] ?? []
+
+      return {
+        ...previous,
+        [publisherId]: rows.map((row) => {
+          if (
+            String(row.publicationId) !== String(publicationId)
+          ) {
+            return row
+          }
+
+          const completed =
+            row.distributedQuantity >= row.orderedQuantity
+
+          return {
+            ...row,
+            distributedQuantity: completed
+              ? 0
+              : row.orderedQuantity,
+          }
+        }),
+      }
+    })
+  }
+
+  const distributeAllForPublisher = (publisherId) => {
+    setPublisherRows((previous) => ({
       ...previous,
-      [`${publisherId}-${publicationId}`]: isChecked,
+      [publisherId]: (previous[publisherId] ?? []).map(
+        (row) => ({
+          ...row,
+          distributedQuantity: row.orderedQuantity,
+        }),
+      ),
     }))
   }
 
@@ -138,21 +186,16 @@ function Distribution({
       setSaving(true)
 
       const requests = publishers.flatMap((publisher) =>
-        publications.map((publication) => {
-          const isChecked =
-            checked[
-              `${publisher.id}-${publication.id}`
-            ] ?? false
-
-          return savePublisherPublication({
+        (publisherRows[publisher.id] ?? []).map((row) =>
+          savePublisherPublication({
             publisherId: publisher.id,
-            publicationId: publication.id,
-            orderedQuantity: 1,
-            distributedQuantity: isChecked ? 1 : 0,
+            publicationId: row.publicationId,
+            orderedQuantity: row.orderedQuantity,
+            distributedQuantity: row.distributedQuantity,
             assemblyId,
             accessCode,
-          })
-        }),
+          }),
+        ),
       )
 
       await Promise.all(requests)
@@ -175,15 +218,20 @@ function Distribution({
     }
   }
 
+  const openPublisher = (publisherId) => {
+    sessionStorage.setItem(
+      'publiservice-open-publisher',
+      String(publisherId),
+    )
+
+    onNavigate('publishers')
+  }
+
   const handleNavigation = (label) => {
     if (label === 'Accueil') onNavigate('dashboard')
     if (label === 'Publications') onNavigate('inventory')
-    if (label === 'Distribution') {
-      onNavigate('distribution')
-    }
-    if (label === 'Proclamateurs') {
-      onNavigate('publishers')
-    }
+    if (label === 'Distribution') onNavigate('distribution')
+    if (label === 'Proclamateurs') onNavigate('publishers')
     if (label === 'Assemblée') onNavigate('assemblies')
     if (label === 'Plus') onNavigate('more')
   }
@@ -215,67 +263,156 @@ function Distribution({
         {loading ? (
           <p>Chargement...</p>
         ) : filteredPublishers.length === 0 ? (
-          <p>Aucun proclamateur trouvé.</p>
+          <p>
+            Aucun proclamateur avec une publication commandée.
+          </p>
         ) : (
           <div className="publication-list">
-            {filteredPublishers.map((publisher) => (
-              <div
-                key={publisher.id}
-                className="publication-card"
-              >
-                <div className="publication-icon">
-                  <strong>
-                    {(publisher.firstName?.[0] ?? '') +
-                      (publisher.lastName?.[0] ?? '')}
-                  </strong>
-                </div>
+            {filteredPublishers.map((publisher) => {
+              const rows =
+                publisherRows[publisher.id] ?? []
 
-                <div className="publication-info">
-                  <strong>
-                    {publisher.firstName}{' '}
-                    {publisher.lastName}
-                  </strong>
+              const allDistributed =
+                rows.length > 0 &&
+                rows.every(
+                  (row) =>
+                    row.distributedQuantity >=
+                    row.orderedQuantity,
+                )
 
-                  {publications.map((publication) => {
-                    const key =
-                      `${publisher.id}-${publication.id}`
-
-                    return (
-                      <label
-                        key={publication.id}
+              return (
+                <article
+                  key={publisher.id}
+                  className="publication-card"
+                  style={{
+                    alignItems: 'flex-start',
+                    padding: 18,
+                  }}
+                >
+                  <div
+                    className="publication-info"
+                    style={{ width: '100%' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openPublisher(publisher.id)
+                      }
+                      style={{
+                        appearance: 'none',
+                        border: 0,
+                        padding: 0,
+                        background: 'transparent',
+                        color: 'inherit',
+                        font: 'inherit',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        marginBottom: 14,
+                      }}
+                    >
+                      <strong
                         style={{
-                          display: 'flex',
-                          justifyContent:
-                            'space-between',
-                          alignItems: 'center',
-                          gap: 12,
-                          marginTop: 8,
-                          cursor: 'pointer',
+                          fontSize: 18,
+                          lineHeight: 1.25,
                         }}
                       >
-                        <span>{publication.name}</span>
+                        👤 {publisher.firstName}{' '}
+                        {publisher.lastName}
+                      </strong>
+                    </button>
 
-                        <input
-                          type="checkbox"
-                          checked={checked[key] ?? false}
-                          onChange={(event) =>
-                            handleCheckboxChange(
-                              publisher.id,
-                              publication.id,
-                              event.target.checked,
-                            )
-                          }
-                        />
-                      </label>
-                    )
-                  })}
-                </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gap: 10,
+                      }}
+                    >
+                      {rows.map((row) => {
+                        const publication =
+                          publicationById[
+                            String(row.publicationId)
+                          ]
 
-                <span className="publication-chevron">
-                  ›
-                </span>
-              </div>
-            ))}
+                        const completed =
+                          row.distributedQuantity >=
+                          row.orderedQuantity
+
+                        return (
+                          <label
+                            key={row.publicationId}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 11,
+                              cursor: 'pointer',
+                              lineHeight: 1.35,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={completed}
+                              disabled={saving}
+                              onChange={() =>
+                                togglePublication(
+                                  publisher.id,
+                                  row.publicationId,
+                                )
+                              }
+                              style={{
+                                width: 20,
+                                height: 20,
+                                flex: '0 0 auto',
+                                marginTop: 1,
+                                accentColor: '#123b8f',
+                              }}
+                            />
+
+                            <span>
+                              {publication?.name ??
+                                'Publication'}
+                              {row.orderedQuantity > 1
+                                ? ` × ${row.orderedQuantity}`
+                                : ''}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={saving || allDistributed}
+                      onClick={() =>
+                        distributeAllForPublisher(
+                          publisher.id,
+                        )
+                      }
+                      style={{
+                        width: '100%',
+                        marginTop: 16,
+                        minHeight: 44,
+                        borderRadius: 12,
+                        border: allDistributed
+                          ? '1px solid rgba(18, 59, 143, 0.18)'
+                          : '1px solid rgba(18, 59, 143, 0.35)',
+                        background: allDistributed
+                          ? 'rgba(18, 59, 143, 0.08)'
+                          : '#ffffff',
+                        color: '#123b8f',
+                        fontWeight: 800,
+                        cursor: allDistributed
+                          ? 'default'
+                          : 'pointer',
+                      }}
+                    >
+                      {allDistributed
+                        ? '✓ Tout est distribué'
+                        : '✓ Distribuer tout'}
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
 
@@ -297,7 +434,7 @@ function Distribution({
         >
           {saving
             ? 'Enregistrement...'
-            : 'Enregistrer'}
+            : 'Enregistrer la distribution'}
         </button>
       </div>
 
@@ -311,4 +448,3 @@ function Distribution({
 }
 
 export default Distribution
-

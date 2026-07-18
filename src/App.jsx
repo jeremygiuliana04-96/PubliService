@@ -543,11 +543,9 @@ setMovements(nextMovements)
     dashboard: (
       <Dashboard
         publications={publications}
-        movements={movements}
+        publishers={publishers}
         currentAssembly={currentAssembly}
         onNavigate={setScreen}
-        onLogout={handleLogout}
-        logoutLoading={logoutLoading}
         isAdmin={isAdmin}
       />
     ),
