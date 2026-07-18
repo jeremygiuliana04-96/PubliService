@@ -193,56 +193,43 @@ function Dashboard({
                       </h3>
 
                       <div
-                        style={{
-                          display: 'grid',
-                          gap: 8,
-                          marginTop: 16,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            gap: 16,
-                          }}
-                        >
-                          <span>Stock actuel</span>
-                          <strong>{item.stock}</strong>
-                        </div>
+  style={{
+    marginTop: 18,
+    textAlign: 'center',
+  }}
+>
+  <div
+    style={{
+      fontSize: 15,
+      opacity: 0.7,
+      marginBottom: 8,
+    }}
+  >
+    Stock après distribution
+  </div>
 
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            gap: 16,
-                          }}
-                        >
-                          <span>À distribuer</span>
-                          <strong>{item.toDistribute}</strong>
-                        </div>
+  <div
+    style={{
+      fontSize: 34,
+      fontWeight: 800,
+      lineHeight: 1,
+    }}
+  >
+    {item.stockAfterDistribution}
+  </div>
 
-                        <div
-                          style={{
-                            height: 1,
-                            background: 'rgba(15, 23, 42, 0.12)',
-                            margin: '2px 0',
-                          }}
-                        />
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            gap: 16,
-                            fontSize: 16,
-                          }}
-                        >
-                          <strong>Après distribution</strong>
-                          <strong>
-                            {item.stockAfterDistribution}
-                          </strong>
-                        </div>
-                      </div>
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 15,
+      opacity: 0.75,
+    }}
+  >
+    {item.stockAfterDistribution > 1
+      ? 'exemplaires'
+      : 'exemplaire'}
+  </div>
+</div>
 
                       <div
                         style={{
