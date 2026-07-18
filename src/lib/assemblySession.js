@@ -5,7 +5,7 @@ export function saveAssemblySession(assembly) {
     id: assembly.id,
     name: assembly.name,
     isActive: assembly.isActive ?? true,
-    code: assembly.code ?? '',
+    code: assembly.code ?? assembly.accessCode ?? '',
   }
 
   localStorage.setItem(
