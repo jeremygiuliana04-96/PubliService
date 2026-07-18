@@ -1,19 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import BottomNav from '../components/BottomNav'
 import {
-  getPublisherPublications,
-  savePublisherPublication,
-} from '../services/publisherPublicationService'
+  distributeAllRemaining,
+  getPendingDistributions,
+} from '../services/distributionService'
 
 function Distribution({
-  publishers = [],
-  publications = [],
   currentAssembly = null,
   onNavigate,
   isAdmin = false,
 }) {
   const [search, setSearch] = useState('')
-  const [publisherRows, setPublisherRows] = useState({})
+  const [pendingRows, setPendingRows] = useState([])
+  const [selectedRows, setSelectedRows] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -28,104 +27,74 @@ function Distribution({
     currentAssembly?.access_code ??
     currentAssembly?.code
 
+  const loadDistribution = useCallback(async () => {
+    if (!assemblyId || !accessCode) {
+      setPendingRows([])
+      setSelectedRows({})
+      setLoading(false)
+      setErrorMessage(
+        'Les informations de l’assemblée sont introuvables.',
+      )
+      return
+    }
+
+    try {
+      setLoading(true)
+      setErrorMessage('')
+
+      const rows = await getPendingDistributions(
+        assemblyId,
+        accessCode,
+      )
+
+      setPendingRows(rows)
+      setSelectedRows({})
+    } catch (error) {
+      console.error(
+        'Erreur lors du chargement de la distribution :',
+        error,
+      )
+
+      setPendingRows([])
+      setSelectedRows({})
+      setErrorMessage(
+        error?.message ??
+          'Impossible de charger la distribution.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [assemblyId, accessCode])
+
   useEffect(() => {
-    let cancelled = false
-
-    async function loadDistribution() {
-      if (!assemblyId || !accessCode) {
-        if (!cancelled) {
-          setLoading(false)
-          setErrorMessage(
-            'Les informations de l’assemblée sont introuvables.',
-          )
-        }
-
-        return
-      }
-
-      try {
-        setLoading(true)
-        setErrorMessage('')
-
-        const results = await Promise.all(
-          publishers.map(async (publisher) => {
-            const rows = await getPublisherPublications(
-              publisher.id,
-              assemblyId,
-              accessCode,
-            )
-
-            return {
-              publisherId: publisher.id,
-              rows: (rows ?? []).filter(
-                (row) => Number(row.orderedQuantity ?? 0) > 0,
-              ),
-            }
-          }),
-        )
-
-        if (cancelled) return
-
-        const nextPublisherRows = {}
-
-        results.forEach(({ publisherId, rows }) => {
-          nextPublisherRows[publisherId] = rows.map((row) => ({
-            publicationId: row.publicationId,
-            orderedQuantity: Number(row.orderedQuantity ?? 0),
-            distributedQuantity: Number(
-              row.distributedQuantity ?? 0,
-            ),
-          }))
-        })
-
-        setPublisherRows(nextPublisherRows)
-      } catch (error) {
-        console.error(
-          'Erreur lors du chargement de la distribution :',
-          error,
-        )
-
-        if (!cancelled) {
-          setErrorMessage(
-            error?.message ??
-              'Impossible de charger la distribution.',
-          )
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
     loadDistribution()
+  }, [loadDistribution])
 
-    return () => {
-      cancelled = true
-    }
-  }, [publishers, assemblyId, accessCode])
+  const publishers = useMemo(() => {
+    const grouped = new Map()
 
-  const publicationById = useMemo(
-    () =>
-      Object.fromEntries(
-        publications.map((publication) => [
-          String(publication.id),
-          publication,
-        ]),
-      ),
-    [publications],
-  )
+    pendingRows.forEach((row) => {
+      if (!grouped.has(row.publisherId)) {
+        grouped.set(row.publisherId, {
+          id: row.publisherId,
+          firstName: row.publisherFirstName,
+          lastName: row.publisherLastName,
+          rows: [],
+        })
+      }
+
+      grouped.get(row.publisherId).rows.push(row)
+    })
+
+    return Array.from(grouped.values())
+  }, [pendingRows])
 
   const filteredPublishers = useMemo(() => {
     const value = search.toLocaleLowerCase('fr').trim()
 
+    if (!value) return publishers
+
     return publishers.filter((publisher) => {
-      const rows = publisherRows[publisher.id] ?? []
-
-      if (rows.length === 0) return false
-
-      if (!value) return true
-
       const fullName =
         `${publisher.firstName ?? ''} ${publisher.lastName ?? ''}`
           .trim()
@@ -133,46 +102,69 @@ function Distribution({
 
       return fullName.includes(value)
     })
-  }, [publishers, publisherRows, search])
+  }, [publishers, search])
 
-  const togglePublication = (publisherId, publicationId) => {
-    setPublisherRows((previous) => {
-      const rows = previous[publisherId] ?? []
+  const getRowKey = (publisherId, publicationId) =>
+    `${publisherId}:${publicationId}`
 
-      return {
-        ...previous,
-        [publisherId]: rows.map((row) => {
-          if (
-            String(row.publicationId) !== String(publicationId)
-          ) {
-            return row
-          }
+  const togglePublication = (row) => {
+    const key = getRowKey(
+      row.publisherId,
+      row.publicationId,
+    )
 
-          const completed =
-            row.distributedQuantity >= row.orderedQuantity
+    setSelectedRows((previous) => ({
+      ...previous,
+      [key]: !previous[key],
+    }))
+  }
 
-          return {
-            ...row,
-            distributedQuantity: completed
-              ? 0
-              : row.orderedQuantity,
-          }
-        }),
-      }
+  const toggleAllForPublisher = (publisher) => {
+    const selectableRows = publisher.rows.filter(
+      (row) =>
+        row.availableStock >= row.remainingQuantity &&
+        row.remainingQuantity > 0,
+    )
+
+    const allSelected =
+      selectableRows.length > 0 &&
+      selectableRows.every((row) => {
+        const key = getRowKey(
+          row.publisherId,
+          row.publicationId,
+        )
+
+        return Boolean(selectedRows[key])
+      })
+
+    setSelectedRows((previous) => {
+      const next = { ...previous }
+
+      selectableRows.forEach((row) => {
+        const key = getRowKey(
+          row.publisherId,
+          row.publicationId,
+        )
+
+        next[key] = !allSelected
+      })
+
+      return next
     })
   }
 
-  const distributeAllForPublisher = (publisherId) => {
-    setPublisherRows((previous) => ({
-      ...previous,
-      [publisherId]: (previous[publisherId] ?? []).map(
-        (row) => ({
-          ...row,
-          distributedQuantity: row.orderedQuantity,
-        }),
-      ),
-    }))
-  }
+  const selectedPendingRows = useMemo(
+    () =>
+      pendingRows.filter((row) => {
+        const key = getRowKey(
+          row.publisherId,
+          row.publicationId,
+        )
+
+        return Boolean(selectedRows[key])
+      }),
+    [pendingRows, selectedRows],
+  )
 
   const handleSave = async () => {
     if (!assemblyId || !accessCode) {
@@ -182,27 +174,31 @@ function Distribution({
       return
     }
 
+    if (selectedPendingRows.length === 0) {
+      window.alert(
+        'Coche au moins une publication à distribuer.',
+      )
+      return
+    }
+
     try {
       setSaving(true)
+      setErrorMessage('')
 
-      const requests = publishers.flatMap((publisher) =>
-        (publisherRows[publisher.id] ?? []).map((row) =>
-          savePublisherPublication({
-            publisherId: publisher.id,
-            publicationId: row.publicationId,
-            orderedQuantity: row.orderedQuantity,
-            distributedQuantity: row.distributedQuantity,
-            assemblyId,
-            accessCode,
-          }),
-        ),
-      )
-
-      await Promise.all(requests)
+      for (const row of selectedPendingRows) {
+        await distributeAllRemaining({
+          assemblyId,
+          accessCode,
+          publisherId: row.publisherId,
+          publicationId: row.publicationId,
+        })
+      }
 
       window.alert(
         'La distribution a bien été enregistrée.',
       )
+
+      await loadDistribution()
     } catch (error) {
       console.error(
         'Erreur lors de l’enregistrement :',
@@ -213,6 +209,8 @@ function Distribution({
         error?.message ??
           'Impossible d’enregistrer la distribution.',
       )
+
+      await loadDistribution()
     } finally {
       setSaving(false)
     }
@@ -263,22 +261,41 @@ function Distribution({
         {loading ? (
           <p>Chargement...</p>
         ) : filteredPublishers.length === 0 ? (
-          <p>
-            Aucun proclamateur avec une publication commandée.
-          </p>
+          <div
+            className="publication-card"
+            style={{ padding: 18 }}
+          >
+            <strong>Tout est à jour 🎉</strong>
+            <p
+              style={{
+                margin: '8px 0 0',
+                color: 'rgba(0, 0, 0, 0.58)',
+                fontSize: 14,
+              }}
+            >
+              Aucune publication ne reste à distribuer.
+            </p>
+          </div>
         ) : (
           <div className="publication-list">
             {filteredPublishers.map((publisher) => {
-              const rows =
-                publisherRows[publisher.id] ?? []
+              const selectableRows = publisher.rows.filter(
+                (row) =>
+                  row.availableStock >=
+                    row.remainingQuantity &&
+                  row.remainingQuantity > 0,
+              )
 
-              const allDistributed =
-                rows.length > 0 &&
-                rows.every(
-                  (row) =>
-                    row.distributedQuantity >=
-                    row.orderedQuantity,
-                )
+              const allSelected =
+                selectableRows.length > 0 &&
+                selectableRows.every((row) => {
+                  const key = getRowKey(
+                    row.publisherId,
+                    row.publicationId,
+                  )
+
+                  return Boolean(selectedRows[key])
+                })
 
               return (
                 <article
@@ -324,39 +341,46 @@ function Distribution({
                     <div
                       style={{
                         display: 'grid',
-                        gap: 10,
+                        gap: 12,
                       }}
                     >
-                      {rows.map((row) => {
-                        const publication =
-                          publicationById[
-                            String(row.publicationId)
-                          ]
+                      {publisher.rows.map((row) => {
+                        const key = getRowKey(
+                          row.publisherId,
+                          row.publicationId,
+                        )
 
-                        const completed =
-                          row.distributedQuantity >=
-                          row.orderedQuantity
+                        const insufficientStock =
+                          row.availableStock <
+                          row.remainingQuantity
 
                         return (
                           <label
-                            key={row.publicationId}
+                            key={key}
                             style={{
                               display: 'flex',
                               alignItems: 'flex-start',
                               gap: 11,
-                              cursor: 'pointer',
+                              cursor:
+                                saving || insufficientStock
+                                  ? 'default'
+                                  : 'pointer',
                               lineHeight: 1.35,
+                              opacity: insufficientStock
+                                ? 0.65
+                                : 1,
                             }}
                           >
                             <input
                               type="checkbox"
-                              checked={completed}
-                              disabled={saving}
+                              checked={Boolean(
+                                selectedRows[key],
+                              )}
+                              disabled={
+                                saving || insufficientStock
+                              }
                               onChange={() =>
-                                togglePublication(
-                                  publisher.id,
-                                  row.publicationId,
-                                )
+                                togglePublication(row)
                               }
                               style={{
                                 width: 20,
@@ -368,47 +392,62 @@ function Distribution({
                             />
 
                             <span>
-                              {publication?.name ??
-                                'Publication'}
-                              {row.orderedQuantity > 1
-                                ? ` × ${row.orderedQuantity}`
-                                : ''}
+                              <strong>
+                                {row.publicationName}
+                              </strong>
+
+                              <small
+                                style={{
+                                  display: 'block',
+                                  marginTop: 4,
+                                  color: insufficientStock
+                                    ? '#a13d2d'
+                                    : 'rgba(0, 0, 0, 0.58)',
+                                }}
+                              >
+                                À distribuer :{' '}
+                                {row.remainingQuantity}
+                                {' · '}
+                                Stock : {row.availableStock}
+                                {insufficientStock
+                                  ? ' · Stock insuffisant'
+                                  : ''}
+                              </small>
                             </span>
                           </label>
                         )
                       })}
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={saving || allDistributed}
-                      onClick={() =>
-                        distributeAllForPublisher(
-                          publisher.id,
-                        )
-                      }
-                      style={{
-                        width: '100%',
-                        marginTop: 16,
-                        minHeight: 44,
-                        borderRadius: 12,
-                        border: allDistributed
-                          ? '1px solid rgba(18, 59, 143, 0.18)'
-                          : '1px solid rgba(18, 59, 143, 0.35)',
-                        background: allDistributed
-                          ? 'rgba(18, 59, 143, 0.08)'
-                          : '#ffffff',
-                        color: '#123b8f',
-                        fontWeight: 800,
-                        cursor: allDistributed
-                          ? 'default'
-                          : 'pointer',
-                      }}
-                    >
-                      {allDistributed
-                        ? '✓ Tout est distribué'
-                        : '✓ Distribuer tout'}
-                    </button>
+                    {selectableRows.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          toggleAllForPublisher(publisher)
+                        }
+                        style={{
+                          width: '100%',
+                          marginTop: 16,
+                          minHeight: 44,
+                          borderRadius: 12,
+                          border:
+                            '1px solid rgba(18, 59, 143, 0.35)',
+                          background: allSelected
+                            ? 'rgba(18, 59, 143, 0.08)'
+                            : '#ffffff',
+                          color: '#123b8f',
+                          fontWeight: 800,
+                          cursor: saving
+                            ? 'default'
+                            : 'pointer',
+                        }}
+                      >
+                        {allSelected
+                          ? 'Retirer la sélection'
+                          : '✓ Sélectionner tout'}
+                      </button>
+                    )}
                   </div>
                 </article>
               )
@@ -422,6 +461,7 @@ function Distribution({
           disabled={
             saving ||
             loading ||
+            selectedPendingRows.length === 0 ||
             !assemblyId ||
             !accessCode
           }
@@ -434,7 +474,11 @@ function Distribution({
         >
           {saving
             ? 'Enregistrement...'
-            : 'Enregistrer la distribution'}
+            : `Enregistrer la distribution${
+                selectedPendingRows.length > 0
+                  ? ` (${selectedPendingRows.length})`
+                  : ''
+              }`}
         </button>
       </div>
 

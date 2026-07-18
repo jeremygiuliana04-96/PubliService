@@ -181,19 +181,21 @@ function Publishers({
   }
 
   const updatePreferenceQuantity = (preferenceKey, value) => {
-    const numericValue = Math.min(
-      10,
-      Math.max(0, Number(value) || 0),
-    )
+  const cleanValue = String(value).replace(/\D/g, '')
 
-    setPreferences((items) =>
-      items.map((item) =>
-        item.preferenceKey === preferenceKey
-          ? { ...item, quantity: numericValue }
-          : item,
-      ),
-    )
-  }
+  const quantity =
+    cleanValue === ''
+      ? ''
+      : Math.min(10, Math.max(0, Number(cleanValue)))
+
+  setPreferences((items) =>
+    items.map((item) =>
+      item.preferenceKey === preferenceKey
+        ? { ...item, quantity }
+        : item,
+    ),
+  )
+}
 
   const submitPublisher = async (event) => {
     event.preventDefault()
@@ -220,7 +222,10 @@ function Publishers({
 
       await saveAllPublisherPreferences(
         savedPublisher.id,
-        preferences,
+        preferences.map((preference) => ({
+          ...preference,
+          quantity: Number(preference.quantity) || 0,
+        })),
         currentAssembly?.id,
         currentAssembly?.code,
       )
@@ -459,13 +464,23 @@ function Publishers({
                                 min="0"
                                 max="10"
                                 inputMode="numeric"
-                                value={preference?.quantity ?? 0}
+                                value={preference?.quantity ?? ''}
+                                onFocus={(event) => {
+                                  if (event.target.value === '0') {
+                                    updatePreferenceQuantity(option.key, '')
+                                  }
+                                }}
                                 onChange={(event) =>
                                   updatePreferenceQuantity(
                                     option.key,
                                     event.target.value,
                                   )
                                 }
+                                 onBlur={(event) => {
+                                   if (event.target.value === '') {
+                                     updatePreferenceQuantity(option.key, '0')
+                                   }
+                                }}
                                 disabled={saving}
                                 aria-label={`${group.label} — ${option.label}`}
                               />
