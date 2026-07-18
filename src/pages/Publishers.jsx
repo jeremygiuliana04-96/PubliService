@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import BottomNav from '../components/BottomNav'
 import {
-  getPublisherPublications,
-  saveAllPublisherPublications,
+  PUBLISHER_PREFERENCE_GROUPS,
+  getPublisherPreferences,
+  saveAllPublisherPreferences,
 } from '../services/publisherPublicationService'
 
 function PeopleIcon() {
@@ -40,16 +41,20 @@ function SearchIcon() {
   )
 }
 
-const createEmptyQuantities = (publications) =>
-  publications.map((publication) => ({
-    publicationId: publication.id,
-    orderedQuantity: 0,
-    distributedQuantity: 0,
+const getAllPreferenceOptions = () =>
+  PUBLISHER_PREFERENCE_GROUPS.flatMap((group) => group.options)
+
+const createEmptyPreferences = () =>
+  getAllPreferenceOptions().map((option) => ({
+    preferenceKey: option.key,
+    publicationType: option.publicationType,
+    language: option.language,
+    format: option.format,
+    quantity: 0,
   }))
 
 function Publishers({
   publishers = [],
-  publications = [],
   currentAssembly,
   onAdd,
   onUpdate,
@@ -65,7 +70,9 @@ function Publishers({
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [publicationQuantities, setPublicationQuantities] = useState([])
+  const [preferences, setPreferences] = useState(
+    createEmptyPreferences,
+  )
 
   const [saving, setSaving] = useState(false)
   const [loadingDetails, setLoadingDetails] = useState(false)
@@ -89,7 +96,7 @@ function Publishers({
   const handleNavigation = (label) => {
     if (label === 'Accueil') onNavigate('dashboard')
     if (label === 'Publications') onNavigate('inventory')
-  if (label === 'Distribution') onNavigate('distribution')
+    if (label === 'Distribution') onNavigate('distribution')
     if (label === 'Proclamateurs') onNavigate('publishers')
     if (label === 'Assemblée') onNavigate('assemblies')
     if (label === 'Plus') onNavigate('more')
@@ -101,7 +108,7 @@ function Publishers({
     setPhone('')
     setEmail('')
     setSelectedPublisher(null)
-    setPublicationQuantities(createEmptyQuantities(publications))
+    setPreferences(createEmptyPreferences())
     setFormError('')
   }
 
@@ -116,29 +123,28 @@ function Publishers({
     setLastName(publisher.lastName ?? '')
     setPhone(publisher.phone ?? '')
     setEmail(publisher.email ?? '')
-    setPublicationQuantities(createEmptyQuantities(publications))
+    setPreferences(createEmptyPreferences())
     setFormError('')
     setShowForm(true)
     setLoadingDetails(true)
 
     try {
-      const savedQuantities =
-        await getPublisherPublications(
-          publisher.id,
-          currentAssembly?.id,
-          currentAssembly?.code,
-        )
+      const savedPreferences = await getPublisherPreferences(
+        publisher.id,
+        currentAssembly?.id,
+        currentAssembly?.code,
+      )
 
-      setPublicationQuantities(
-        publications.map((publication) => {
-          const saved = savedQuantities.find(
-            (item) => item.publicationId === publication.id,
+      setPreferences(
+        createEmptyPreferences().map((preference) => {
+          const saved = savedPreferences.find(
+            (item) =>
+              item.preferenceKey === preference.preferenceKey,
           )
 
           return {
-            publicationId: publication.id,
-            orderedQuantity: saved?.orderedQuantity ?? 0,
-            distributedQuantity: saved?.distributedQuantity ?? 0,
+            ...preference,
+            quantity: saved?.quantity ?? 0,
           }
         }),
       )
@@ -148,7 +154,6 @@ function Publishers({
       setLoadingDetails(false)
     }
   }
-
 
   useEffect(() => {
     const publisherId = sessionStorage.getItem(
@@ -163,12 +168,8 @@ function Publishers({
 
     if (!publisher) return
 
-    sessionStorage.removeItem(
-      'publiservice-open-publisher',
-    )
-
+    sessionStorage.removeItem('publiservice-open-publisher')
     openEditForm(publisher)
-    // Ouverture demandee depuis Distribution uniquement.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publishers])
 
@@ -179,27 +180,18 @@ function Publishers({
     resetForm()
   }
 
-  const updatePublicationQuantity = (publicationId, field, value) => {
-    const numericValue = Math.max(0, Number(value) || 0)
+  const updatePreferenceQuantity = (preferenceKey, value) => {
+    const numericValue = Math.min(
+      10,
+      Math.max(0, Number(value) || 0),
+    )
 
-    setPublicationQuantities((items) =>
-      items.map((item) => {
-        if (item.publicationId !== publicationId) return item
-
-        const nextItem = {
-          ...item,
-          [field]: numericValue,
-        }
-
-        if (
-          field === 'orderedQuantity' &&
-          nextItem.distributedQuantity > numericValue
-        ) {
-          nextItem.distributedQuantity = numericValue
-        }
-
-        return nextItem
-      }),
+    setPreferences((items) =>
+      items.map((item) =>
+        item.preferenceKey === preferenceKey
+          ? { ...item, quantity: numericValue }
+          : item,
+      ),
     )
   }
 
@@ -222,20 +214,13 @@ function Publishers({
     }
 
     try {
-      let savedPublisher
+      const savedPublisher = selectedPublisher
+        ? await onUpdate(selectedPublisher.id, publisherData)
+        : await onAdd(publisherData)
 
-      if (selectedPublisher) {
-        savedPublisher = await onUpdate(
-          selectedPublisher.id,
-          publisherData,
-        )
-      } else {
-        savedPublisher = await onAdd(publisherData)
-      }
-
-      await saveAllPublisherPublications(
+      await saveAllPublisherPreferences(
         savedPublisher.id,
-        publicationQuantities,
+        preferences,
         currentAssembly?.id,
         currentAssembly?.code,
       )
@@ -319,13 +304,10 @@ function Publishers({
             <span className="publishers-empty__icon">
               <PeopleIcon />
             </span>
-
             <h2>Aucun proclamateur</h2>
-
             <p>
               Les proclamateurs ajoutés à l’assemblée apparaîtront ici.
             </p>
-
             <button
               className="primary-button"
               type="button"
@@ -352,7 +334,6 @@ function Publishers({
                   <strong>
                     {publisher.firstName} {publisher.lastName}
                   </strong>
-
                   <small>
                     {publisher.phone ||
                       publisher.email ||
@@ -437,115 +418,65 @@ function Publishers({
               </label>
 
               <div className="publisher-publications-heading">
-                <h3>Publications</h3>
+                <h3>Quantités habituelles</h3>
                 <p>
-                  Indique la quantité commandée et la quantité déjà
-                  distribuée.
+                  Ces quantités seront reprises automatiquement pour
+                  chaque nouvelle parution.
                 </p>
               </div>
 
               {loadingDetails ? (
                 <p className="form-note">
-                  Chargement des publications…
-                </p>
-              ) : publications.length === 0 ? (
-                <p className="form-note">
-                  Ajoute d’abord des publications dans l’inventaire.
+                  Chargement des préférences…
                 </p>
               ) : (
-                <div className="publisher-publication-list">
-                  {publications.map((publication) => {
-                    const quantities =
-                      publicationQuantities.find(
-                        (item) =>
-                          item.publicationId === publication.id,
-                      ) ?? {
-                        orderedQuantity: 0,
-                        distributedQuantity: 0,
-                      }
+                <div className="publisher-preference-groups">
+                  {PUBLISHER_PREFERENCE_GROUPS.map((group) => (
+                    <section
+                      className="publisher-preference-group"
+                      key={group.key}
+                    >
+                      <h3>
+                        <span aria-hidden="true">{group.icon}</span>{' '}
+                        {group.label}
+                      </h3>
 
-                    return (
-                      <article
-                        className="publisher-publication-card"
-                        key={publication.id}
-                      >
-                        <div className="publisher-publication-title">
-                          <span aria-hidden="true">📖</span>
-                          <div>
-                            <strong>{publication.name}</strong>
-                            <small>
-                              Stock disponible : {publication.stock}
-                            </small>
-                          </div>
-                        </div>
+                      <div className="publisher-preference-list">
+                        {group.options.map((option) => {
+                          const preference = preferences.find(
+                            (item) =>
+                              item.preferenceKey === option.key,
+                          )
 
-                        <div className="publisher-quantity-grid">
-                          <label>
-                            Quantité commandée
-                            <input
-                              type="number"
-                              min="0"
-                              inputMode="numeric"
-                              value={quantities.orderedQuantity}
-                              onChange={(event) =>
-                                updatePublicationQuantity(
-                                  publication.id,
-                                  'orderedQuantity',
-                                  event.target.value,
-                                )
-                              }
-                              disabled={saving}
-                            />
-                          </label>
-
-                          <label>
-                            Quantité distribuée
-                            <input
-                              type="number"
-                              min="0"
-                              max={quantities.orderedQuantity}
-                              inputMode="numeric"
-                              value={quantities.distributedQuantity}
-                              onChange={(event) =>
-                                updatePublicationQuantity(
-                                  publication.id,
-                                  'distributedQuantity',
-                                  event.target.value,
-                                )
-                              }
-                              disabled={saving}
-                            />
-                          </label>
-                        </div>
-
-                        <div className="publisher-distribution-status">
-                          {quantities.orderedQuantity === 0
-                            ? 'Aucune commande'
-                            : quantities.distributedQuantity >=
-                                quantities.orderedQuantity
-                              ? '✓ Distribution terminée'
-                              : `${
-                                  quantities.orderedQuantity -
-                                  quantities.distributedQuantity
-                                } exemplaire(s) à distribuer`}
-                        </div>
-                      </article>
-                    )
-                  })}
+                          return (
+                            <label
+                              className="publisher-preference-row"
+                              key={option.key}
+                            >
+                              <span>{option.label}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                inputMode="numeric"
+                                value={preference?.quantity ?? 0}
+                                onChange={(event) =>
+                                  updatePreferenceQuantity(
+                                    option.key,
+                                    event.target.value,
+                                  )
+                                }
+                                disabled={saving}
+                                aria-label={`${group.label} — ${option.label}`}
+                              />
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               )}
-
-              <div className="publisher-special-requests">
-                <div>
-                  <span aria-hidden="true">📚</span>
-                  <div>
-                    <strong>Demandes spéciales</strong>
-                    <small>
-                      Cette partie sera ajoutée à l’étape suivante.
-                    </small>
-                  </div>
-                </div>
-              </div>
 
               {formError && (
                 <p className="form-message form-message--error">
@@ -595,5 +526,3 @@ function Publishers({
 }
 
 export default Publishers
-
-
