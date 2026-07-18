@@ -24,6 +24,7 @@ const LANGUAGES = [
   'Anglais',
   'Espagnol',
   'Italien',
+  'Italien (Grands caractères)',
 ]
 
 const MONTHS = [
