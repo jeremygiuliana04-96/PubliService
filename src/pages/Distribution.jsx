@@ -278,7 +278,7 @@ function Distribution({
           </div>
         ) : (
           <div
-            className="publication-list"
+            className="publication-list distribution-grid"
             style={{
               display: 'grid',
               gridTemplateColumns:
