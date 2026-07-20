@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import BottomNav from '../components/BottomNav'
-import { BellIcon } from '../components/Icons'
+import SideMenu from '../components/SideMenu'
 import { getStockOverview } from '../services/dashboardService'
 
 const formatDate = (value) =>
@@ -89,14 +88,6 @@ function Dashboard({
     }
   }, [publishers, publications, currentAssembly])
 
-  const handleNavigation = (label) => {
-    if (label === 'Accueil') onNavigate('dashboard')
-    if (label === 'Publications') onNavigate('inventory')
-    if (label === 'Distribution') onNavigate('distribution')
-    if (label === 'Proclamateurs') onNavigate('publishers')
-    if (label === 'Assemblée') onNavigate('assemblies')
-    if (label === 'Plus') onNavigate('more')
-  }
 
   return (
     <section className="phone-page dashboard-page">
@@ -107,13 +98,11 @@ function Dashboard({
             <p>Assemblée de {currentAssembly?.name ?? '—'}</p>
           </div>
 
-          <button
-            className="header-icon"
-            type="button"
-            aria-label="Notifications"
-          >
-            <BellIcon />
-          </button>
+          <SideMenu
+            activeScreen="dashboard"
+            onNavigate={onNavigate}
+            isAdmin={isAdmin}
+          />
         </div>
 
         <div className="dashboard-date">
@@ -255,12 +244,6 @@ function Dashboard({
           )}
         </section>
       </div>
-
-      <BottomNav
-        active="Accueil"
-        onChange={handleNavigation}
-        isAdmin={isAdmin}
-      />
     </section>
   )
 }

@@ -8,6 +8,11 @@ const mapPublication = (publication) => ({
   assemblyId: publication.assembly_id,
   name: publication.name,
   stock: Number(publication.stock ?? 0),
+  publicationType: publication.publication_type ?? null,
+  language: publication.language ?? null,
+  format: publication.format ?? null,
+  month: Number(publication.publication_month ?? 0),
+  year: Number(publication.publication_year ?? 0),
   createdAt: publication.created_at,
 })
 
@@ -75,6 +80,18 @@ export async function createPublication(
       p_stock: Math.max(
         0,
         Number(publication.stock) || 0,
+      ),
+      p_publication_type:
+        publication.publicationType ?? 'specific_request',
+      p_language: publication.language ?? 'other',
+      p_format: publication.format ?? 'standard',
+      p_publication_month: Math.max(
+        1,
+        Math.min(12, Number(publication.month) || 1),
+      ),
+      p_publication_year: Math.max(
+        2020,
+        Number(publication.year) || new Date().getFullYear(),
       ),
     },
   )

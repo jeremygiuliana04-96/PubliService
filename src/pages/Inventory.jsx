@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import BottomNav from '../components/BottomNav'
+import SideMenu from '../components/SideMenu'
 import { BookIcon, PlusIcon } from '../components/Icons'
 
 const formatMovementDate = (value) =>
@@ -11,21 +11,15 @@ const formatMovementDate = (value) =>
     minute: '2-digit',
   }).format(new Date(value))
 
-const PUBLICATIONS = [
-  "Tour de garde d'étude",
-  'Cahier de vie et ministère',
-  'Demande spécifique',
-]
-
 const LANGUAGES = [
   'Français',
-  'Français (Grands caractères)',
   'Néerlandais',
   'Anglais',
   'Espagnol',
   'Italien',
-  'Italien (Grands caractères)',
 ]
+
+const FORMATS = ['Standard', 'Grand Caractère']
 
 const MONTHS = [
   { value: '01', label: 'Janvier' },
@@ -59,9 +53,9 @@ function Inventory({
   const [quantity, setQuantity] = useState('')
   const [showHistory, setShowHistory] = useState(false)
 
-  const [publicationType, setPublicationType] = useState('')
-  const [specificRequest, setSpecificRequest] = useState('')
+  const [publicationName, setPublicationName] = useState('')
   const [publicationLanguage, setPublicationLanguage] = useState('')
+  const [publicationFormat, setPublicationFormat] = useState('Standard')
   const [publicationMonth, setPublicationMonth] = useState('')
   const [publicationYear, setPublicationYear] = useState('2026')
   const [initialStock, setInitialStock] = useState('')
@@ -87,19 +81,11 @@ function Inventory({
     0,
   )
 
-  const handleNavigation = (label) => {
-    if (label === 'Accueil') onNavigate('dashboard')
-    if (label === 'Publications') onNavigate('inventory')
-  if (label === 'Distribution') onNavigate('distribution')
-    if (label === 'Proclamateurs') onNavigate('publishers')
-    if (label === 'Assemblée') onNavigate('assemblies')
-    if (label === 'Plus') onNavigate('more')
-  }
 
   const resetAddForm = () => {
-    setPublicationType('')
-    setSpecificRequest('')
+    setPublicationName('')
     setPublicationLanguage('')
+    setPublicationFormat('Standard')
     setPublicationMonth('')
     setPublicationYear('2026')
     setInitialStock('')
@@ -136,25 +122,22 @@ function Inventory({
 
     if (saving) return
 
-    const cleanSpecificRequest = specificRequest.trim()
+    const cleanPublicationName = publicationName.trim()
 
     if (
-      !publicationType ||
-      (publicationType === 'Demande spécifique' && !cleanSpecificRequest) ||
+      !cleanPublicationName ||
       !publicationLanguage ||
+      !publicationFormat ||
       !publicationMonth ||
-      !publicationYear
+      !publicationYear ||
+      initialStock === ''
     ) {
       setFormError('Complète tous les champs de la publication.')
       return
     }
 
     const monthNumber = String(publicationMonth).padStart(2, '0')
-    const publicationName =
-      publicationType === 'Demande spécifique'
-        ? cleanSpecificRequest
-        : publicationType
-    const cleanName = `${publicationName} - ${publicationLanguage} - ${monthNumber}/${publicationYear}`
+    const cleanName = `${cleanPublicationName} - ${publicationLanguage} - ${publicationFormat} - ${monthNumber}/${publicationYear}`
     const cleanStock = Math.max(
       0,
       Number(initialStock) || 0,
@@ -175,9 +158,39 @@ function Inventory({
     setFormError('')
 
     try {
+      const normalizedName = cleanPublicationName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleLowerCase('fr')
+
+      const detectedPublicationType = normalizedName.includes('tour de garde')
+        ? 'watchtower'
+        : normalizedName.includes('cahier') &&
+            (normalizedName.includes('vie') || normalizedName.includes('ministere'))
+          ? 'workbook'
+          : 'specific_request'
+
+      const languageMap = {
+        'Français': 'fr',
+        'Italien': 'it',
+        'Néerlandais': 'nl',
+        'Anglais': 'en',
+        'Espagnol': 'es',
+      }
+
+      const publicationLanguageCode =
+        languageMap[publicationLanguage] ?? 'other'
+      const publicationFormatCode =
+        publicationFormat === 'Grand Caractère' ? 'large' : 'standard'
+
       await onAdd({
         name: cleanName,
         stock: cleanStock,
+        publicationType: detectedPublicationType,
+        language: publicationLanguageCode,
+        format: publicationFormatCode,
+        month: Number(publicationMonth),
+        year: Number(publicationYear),
       })
 
       setShowAddForm(false)
@@ -268,17 +281,25 @@ function Inventory({
           <h1>Inventaire</h1>
         </div>
 
-        <button
-          className="inventory-add-button"
-          type="button"
-          onClick={() => {
-            resetAddForm()
-            setShowAddForm(true)
-          }}
-        >
-          <PlusIcon />
-          <span>Ajouter</span>
-        </button>
+        <div className="header-actions">
+          <button
+            className="inventory-add-button"
+            type="button"
+            onClick={() => {
+              resetAddForm()
+              setShowAddForm(true)
+            }}
+          >
+            <PlusIcon />
+            <span>Ajouter</span>
+          </button>
+
+          <SideMenu
+            activeScreen="inventory"
+            onNavigate={onNavigate}
+            isAdmin={isAdmin}
+          />
+        </div>
       </header>
 
       <div className="inventory-content">
@@ -568,47 +589,21 @@ function Inventory({
               onSubmit={submitPublication}
             >
               <label>
-                Choisissez votre publication
-                <select
-                  value={publicationType}
-                  onChange={(event) => {
-                    const nextType = event.target.value
-                    setPublicationType(nextType)
-
-                    if (nextType !== 'Demande spécifique') {
-                      setSpecificRequest('')
-                    }
-                  }}
+                Nom de la publication
+                <input
+                  value={publicationName}
+                  onChange={(event) =>
+                    setPublicationName(event.target.value)
+                  }
+                  placeholder="Ex. Tour de garde d’étude"
                   autoFocus
                   disabled={saving}
                   required
-                >
-                  <option value="">Sélectionner une publication</option>
-                  {PUBLICATIONS.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
 
-              {publicationType === 'Demande spécifique' && (
-                <label>
-                  Précisez votre demande
-                  <input
-                    value={specificRequest}
-                    onChange={(event) =>
-                      setSpecificRequest(event.target.value)
-                    }
-                    placeholder="Ex. Brochure spéciale"
-                    disabled={saving}
-                    required
-                  />
-                </label>
-              )}
-
               <label>
-                Langue / format
+                Langue
                 <select
                   value={publicationLanguage}
                   onChange={(event) =>
@@ -621,6 +616,24 @@ function Inventory({
                   {LANGUAGES.map((language) => (
                     <option key={language} value={language}>
                       {language}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Format
+                <select
+                  value={publicationFormat}
+                  onChange={(event) =>
+                    setPublicationFormat(event.target.value)
+                  }
+                  disabled={saving}
+                  required
+                >
+                  {FORMATS.map((format) => (
+                    <option key={format} value={format}>
+                      {format}
                     </option>
                   ))}
                 </select>
@@ -680,16 +693,15 @@ function Inventory({
                 />
               </label>
 
-              {publicationType &&
+              {publicationName.trim() &&
                 publicationLanguage &&
+                publicationFormat &&
                 publicationMonth && (
                   <p className="publication-preview">
                     <span>Aperçu</span>
                     <strong>
-                      {publicationType === 'Demande spécifique'
-                        ? specificRequest.trim() || 'Demande spécifique'
-                        : publicationType}{' '}
-                      - {publicationLanguage} -{' '}
+                      {publicationName.trim()} - {publicationLanguage} -{' '}
+                      {publicationFormat} -{' '}
                       {String(publicationMonth).padStart(2, '0')}/
                       {publicationYear}
                     </strong>
@@ -724,12 +736,6 @@ function Inventory({
           </section>
         </div>
       )}
-
-      <BottomNav
-        active="Publications"
-        onChange={handleNavigation}
-        isAdmin={isAdmin}
-      />
     </section>
   )
 }

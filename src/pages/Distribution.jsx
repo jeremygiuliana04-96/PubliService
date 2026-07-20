@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import BottomNav from '../components/BottomNav'
+import SideMenu from '../components/SideMenu'
 import {
   distributeAllRemaining,
   getPendingDistributions,
@@ -225,14 +225,6 @@ function Distribution({
     onNavigate('publishers')
   }
 
-  const handleNavigation = (label) => {
-    if (label === 'Accueil') onNavigate('dashboard')
-    if (label === 'Publications') onNavigate('inventory')
-    if (label === 'Distribution') onNavigate('distribution')
-    if (label === 'Proclamateurs') onNavigate('publishers')
-    if (label === 'Assemblée') onNavigate('assemblies')
-    if (label === 'Plus') onNavigate('more')
-  }
 
   return (
     <section className="phone-page dashboard-page inventory-page">
@@ -241,6 +233,12 @@ function Distribution({
           <p>GESTION DE L&apos;ASSEMBLÉE</p>
           <h1>Distribution</h1>
         </div>
+
+        <SideMenu
+            activeScreen="distribution"
+            onNavigate={onNavigate}
+            isAdmin={isAdmin}
+          />
       </header>
 
       <div className="inventory-content">
@@ -509,12 +507,6 @@ function Distribution({
               }`}
         </button>
       </div>
-
-      <BottomNav
-        active="Distribution"
-        onChange={handleNavigation}
-        isAdmin={isAdmin}
-      />
     </section>
   )
 }

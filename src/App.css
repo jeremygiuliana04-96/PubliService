@@ -1307,3 +1307,255 @@ button { -webkit-tap-highlight-color: transparent; }
     height: 19px !important;
   }
 }
+/* V6 — navigation latérale */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.side-menu-trigger {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, .12);
+  cursor: pointer;
+}
+
+.side-menu-trigger svg {
+  width: 22px;
+  height: 22px;
+}
+
+.side-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(5, 23, 49, .48);
+  backdrop-filter: blur(3px);
+  animation: side-menu-fade .18s ease-out;
+}
+
+.side-menu-panel {
+  width: min(82%, 310px);
+  height: 100%;
+  padding: 22px 16px;
+  color: var(--text);
+  background: #fff;
+  box-shadow: -18px 0 45px rgba(5, 31, 67, .22);
+  animation: side-menu-slide .22s ease-out;
+}
+
+.side-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 4px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.side-menu-heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.side-menu-heading span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+
+.side-menu-heading strong {
+  color: var(--blue-950);
+  font-size: 21px;
+}
+
+.side-menu-heading button {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--blue-950);
+  background: var(--blue-50);
+  font-size: 29px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.side-menu-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.side-menu-list button {
+  width: 100%;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 38px 1fr 14px;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.side-menu-list button > span {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--blue-800);
+  background: var(--blue-100);
+}
+
+.side-menu-list button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.side-menu-list button strong {
+  font-size: 13px;
+}
+
+.side-menu-list button small {
+  color: #a8b2c1;
+  font-size: 22px;
+}
+
+.side-menu-list button.is-active {
+  border-color: rgba(10, 77, 168, .13);
+  color: var(--blue-950);
+  background: var(--blue-50);
+}
+
+.side-menu-list button.is-active > span {
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue-900), var(--blue-700));
+}
+
+.dashboard-content,
+.inventory-content,
+.publishers-content,
+.more-content {
+  padding-bottom: 24px;
+}
+
+@keyframes side-menu-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes side-menu-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Historique des distributions d’un proclamateur */
+.publisher-history-section {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.publisher-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.publisher-history-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 15px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.publisher-history-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.publisher-history-information {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.publisher-history-information strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publisher-history-information small,
+.publisher-history-row time {
+  color: rgba(15, 23, 42, 0.58);
+  font-size: 12px;
+}
+
+.publisher-history-row time {
+  white-space: nowrap;
+}
+
+.publisher-history-empty {
+  padding: 16px;
+  border: 1px dashed rgba(15, 23, 42, 0.16);
+  border-radius: 15px;
+  color: rgba(15, 23, 42, 0.58);
+  text-align: center;
+  font-size: 13px;
+}
+
+/* Fiche proclamateur — publications / historique */
+.publisher-detail-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 5px;
+  margin: 4px 0 18px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.06);
+}
+.publisher-detail-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(15, 23, 42, 0.62);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.publisher-detail-tabs button.is-active {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.1);
+}

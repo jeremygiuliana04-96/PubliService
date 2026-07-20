@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import BottomNav from '../components/BottomNav'
+import SideMenu from '../components/SideMenu'
 import {
   PUBLISHER_PREFERENCE_GROUPS,
+  getPublisherDistributionHistory,
   getPublisherPreferences,
   saveAllPublisherPreferences,
 } from '../services/publisherPublicationService'
@@ -77,6 +78,8 @@ function Publishers({
   const [saving, setSaving] = useState(false)
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [formError, setFormError] = useState('')
+  const [distributionHistory, setDistributionHistory] = useState([])
+  const [detailTab, setDetailTab] = useState('preferences')
 
   const filteredPublishers = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('fr')
@@ -93,14 +96,6 @@ function Publishers({
     })
   }, [publishers, search])
 
-  const handleNavigation = (label) => {
-    if (label === 'Accueil') onNavigate('dashboard')
-    if (label === 'Publications') onNavigate('inventory')
-    if (label === 'Distribution') onNavigate('distribution')
-    if (label === 'Proclamateurs') onNavigate('publishers')
-    if (label === 'Assemblée') onNavigate('assemblies')
-    if (label === 'Plus') onNavigate('more')
-  }
 
   const resetForm = () => {
     setFirstName('')
@@ -110,6 +105,8 @@ function Publishers({
     setSelectedPublisher(null)
     setPreferences(createEmptyPreferences())
     setFormError('')
+    setDistributionHistory([])
+    setDetailTab('preferences')
   }
 
   const openAddForm = () => {
@@ -126,20 +123,27 @@ function Publishers({
     setPreferences(createEmptyPreferences())
     setFormError('')
     setShowForm(true)
+    setDetailTab('preferences')
     setLoadingDetails(true)
 
     try {
-      const savedPreferences = await getPublisherPreferences(
-        publisher.id,
-        currentAssembly?.id,
-        currentAssembly?.code,
-      )
+      const [savedPreferences, history] = await Promise.all([
+        getPublisherPreferences(
+          publisher.id,
+          currentAssembly?.id,
+          currentAssembly?.code,
+        ),
+        getPublisherDistributionHistory(
+          publisher.id,
+          currentAssembly?.id,
+          currentAssembly?.code,
+        ),
+      ])
 
       setPreferences(
         createEmptyPreferences().map((preference) => {
           const saved = savedPreferences.find(
-            (item) =>
-              item.preferenceKey === preference.preferenceKey,
+            (item) => item.preferenceKey === preference.preferenceKey,
           )
 
           return {
@@ -148,6 +152,7 @@ function Publishers({
           }
         }),
       )
+      setDistributionHistory(history)
     } catch (error) {
       setFormError(error.message)
     } finally {
@@ -270,14 +275,22 @@ function Publishers({
           <h1>Proclamateurs</h1>
         </div>
 
-        <button
-          className="inventory-add-button"
-          type="button"
-          onClick={openAddForm}
-        >
-          <span aria-hidden="true">＋</span>
-          Ajouter
-        </button>
+        <div className="header-actions">
+          <button
+            className="inventory-add-button"
+            type="button"
+            onClick={openAddForm}
+          >
+            <span aria-hidden="true">＋</span>
+            Ajouter
+          </button>
+
+          <SideMenu
+            activeScreen="publishers"
+            onNavigate={onNavigate}
+            isAdmin={isAdmin}
+          />
+        </div>
       </header>
 
       <div className="publishers-content">
@@ -422,74 +435,154 @@ function Publishers({
                 />
               </label>
 
-              <div className="publisher-publications-heading">
-                <h3>Quantités habituelles</h3>
-                <p>
-                  Ces quantités seront reprises automatiquement pour
-                  chaque nouvelle parution.
-                </p>
-              </div>
+              {selectedPublisher && (
+                <div className="publisher-detail-tabs" role="tablist">
+                  <button
+                    type="button"
+                    className={detailTab === 'preferences' ? 'is-active' : ''}
+                    onClick={() => setDetailTab('preferences')}
+                    role="tab"
+                    aria-selected={detailTab === 'preferences'}
+                  >
+                    Publications
+                  </button>
+                  <button
+                    type="button"
+                    className={detailTab === 'history' ? 'is-active' : ''}
+                    onClick={() => setDetailTab('history')}
+                    role="tab"
+                    aria-selected={detailTab === 'history'}
+                  >
+                    Historique
+                  </button>
+                </div>
+              )}
 
-              {loadingDetails ? (
-                <p className="form-note">
-                  Chargement des préférences…
-                </p>
-              ) : (
-                <div className="publisher-preference-groups">
-                  {PUBLISHER_PREFERENCE_GROUPS.map((group) => (
-                    <section
-                      className="publisher-preference-group"
-                      key={group.key}
-                    >
-                      <h3>
-                        <span aria-hidden="true">{group.icon}</span>{' '}
-                        {group.label}
-                      </h3>
+              {(!selectedPublisher || detailTab === 'preferences') && (
+                <>
+                  <div className="publisher-publications-heading">
+                    <h3>Quantités habituelles</h3>
+                    <p>
+                      Plusieurs publications peuvent être attribuées au même
+                      proclamateur. Les quantités sont reprises pour chaque
+                      nouvelle parution correspondante.
+                    </p>
+                  </div>
 
-                      <div className="publisher-preference-list">
-                        {group.options.map((option) => {
-                          const preference = preferences.find(
-                            (item) =>
-                              item.preferenceKey === option.key,
-                          )
+                  {loadingDetails ? (
+                    <p className="form-note">
+                      Chargement des préférences…
+                    </p>
+                  ) : (
+                    <div className="publisher-preference-groups">
+                      {PUBLISHER_PREFERENCE_GROUPS.map((group) => (
+                        <section
+                          className="publisher-preference-group"
+                          key={group.key}
+                        >
+                          <h3>
+                            <span aria-hidden="true">{group.icon}</span>{' '}
+                            {group.label}
+                          </h3>
 
-                          return (
-                            <label
-                              className="publisher-preference-row"
-                              key={option.key}
-                            >
-                              <span>{option.label}</span>
-                              <input
-                                type="number"
-                                min="0"
-                                max="10"
-                                inputMode="numeric"
-                                value={preference?.quantity ?? ''}
-                                onFocus={(event) => {
-                                  if (event.target.value === '0') {
-                                    updatePreferenceQuantity(option.key, '')
-                                  }
-                                }}
-                                onChange={(event) =>
-                                  updatePreferenceQuantity(
-                                    option.key,
-                                    event.target.value,
-                                  )
-                                }
-                                 onBlur={(event) => {
-                                   if (event.target.value === '') {
-                                     updatePreferenceQuantity(option.key, '0')
-                                   }
-                                }}
-                                disabled={saving}
-                                aria-label={`${group.label} — ${option.label}`}
-                              />
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </section>
-                  ))}
+                          <div className="publisher-preference-list">
+                            {group.options.map((option) => {
+                              const preference = preferences.find(
+                                (item) =>
+                                  item.preferenceKey === option.key,
+                              )
+
+                              return (
+                                <label
+                                  className="publisher-preference-row"
+                                  key={option.key}
+                                >
+                                  <span>{option.label}</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="10"
+                                    inputMode="numeric"
+                                    value={preference?.quantity ?? ''}
+                                    onFocus={(event) => {
+                                      if (event.target.value === '0') {
+                                        updatePreferenceQuantity(option.key, '')
+                                      }
+                                    }}
+                                    onChange={(event) =>
+                                      updatePreferenceQuantity(
+                                        option.key,
+                                        event.target.value,
+                                      )
+                                    }
+                                    onBlur={(event) => {
+                                      if (event.target.value === '') {
+                                        updatePreferenceQuantity(option.key, '0')
+                                      }
+                                    }}
+                                    disabled={saving}
+                                    aria-label={`${group.label} — ${option.label}`}
+                                  />
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {selectedPublisher && detailTab === 'history' && (
+                <div className="publisher-history-section">
+                  <div className="publisher-publications-heading">
+                    <h3>Publications distribuées</h3>
+                    <p>Uniquement les publications réellement remises.</p>
+                  </div>
+
+                  {loadingDetails ? (
+                    <p className="form-note">Chargement de l’historique…</p>
+                  ) : distributionHistory.length === 0 ? (
+                    <div className="publisher-history-empty">
+                      Aucune publication distribuée pour le moment.
+                    </div>
+                  ) : (
+                    <div className="publisher-history-list">
+                      {distributionHistory.map((item) => (
+                        <article
+                          className="publisher-history-row"
+                          key={item.distributionId}
+                        >
+                          <span
+                            className="publisher-history-icon"
+                            aria-hidden="true"
+                          >
+                            {item.publicationType === 'workbook' ? '📗' : '📘'}
+                          </span>
+
+                          <span className="publisher-history-information">
+                            <strong>{item.publicationName}</strong>
+                            <small>
+                              {item.quantity > 1
+                                ? `${item.quantity} exemplaires`
+                                : '1 exemplaire'}
+                            </small>
+                          </span>
+
+                          <time dateTime={item.distributedAt ?? undefined}>
+                            {item.distributedAt
+                              ? new Intl.DateTimeFormat('fr-BE', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                }).format(new Date(item.distributedAt))
+                              : '—'}
+                          </time>
+                        </article>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -530,12 +623,6 @@ function Publishers({
           </section>
         </div>
       )}
-
-      <BottomNav
-        active="Proclamateurs"
-        onChange={handleNavigation}
-        isAdmin={isAdmin}
-      />
     </section>
   )
 }

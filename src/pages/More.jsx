@@ -1,7 +1,6 @@
-import BottomNav from '../components/BottomNav'
+import SideMenu from '../components/SideMenu'
 import {
   HomeIcon,
-  SettingsIcon,
 } from '../components/Icons'
 
 function Chevron() {
@@ -20,13 +19,6 @@ function More({
   logoutLoading = false,
   isAdmin = false,
 }) {
-  const handleNavigation = (label) => {
-    if (label === 'Accueil') onNavigate('dashboard')
-    if (label === 'Publications') onNavigate('inventory')
-    if (label === 'Distribution') onNavigate('distribution')
-    if (label === 'Proclamateurs') onNavigate('publishers')
-    if (label === 'Plus') onNavigate('more')
-  }
 
   const assemblyName = currentAssembly?.name ?? '—'
   const assemblyCode = currentAssembly?.code ?? '—'
@@ -39,9 +31,11 @@ function More({
           <h1>Plus</h1>
         </div>
 
-        <span className="more-header-icon" aria-hidden="true">
-          <SettingsIcon />
-        </span>
+        <SideMenu
+            activeScreen="more"
+            onNavigate={onNavigate}
+            isAdmin={isAdmin}
+          />
       </header>
 
       <div className="more-content">
@@ -156,12 +150,6 @@ function More({
           </button>
         </section>
       </div>
-
-      <BottomNav
-        active="Plus"
-        onChange={handleNavigation}
-        isAdmin={isAdmin}
-      />
     </section>
   )
 }
