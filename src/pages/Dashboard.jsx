@@ -9,29 +9,6 @@ const formatDate = (value) =>
     month: 'long',
   }).format(value)
 
-const STATUS_CONFIG = {
-  sufficient: {
-    label: 'Stock suffisant',
-    icon: '🟢',
-    background: 'rgba(34, 197, 94, 0.08)',
-    border: 'rgba(34, 197, 94, 0.25)',
-    color: '#15803d',
-  },
-  low: {
-    label: 'Stock faible',
-    icon: '🟠',
-    background: 'rgba(245, 158, 11, 0.09)',
-    border: 'rgba(245, 158, 11, 0.28)',
-    color: '#b45309',
-  },
-  insufficient: {
-    label: 'Stock insuffisant',
-    icon: '🔴',
-    background: 'rgba(239, 68, 68, 0.08)',
-    border: 'rgba(239, 68, 68, 0.25)',
-    color: '#b91c1c',
-  },
-}
 
 function Dashboard({
   publications = [],
@@ -141,18 +118,14 @@ function Dashboard({
               }}
             >
               {stockOverview.map((item) => {
-                const status =
-                  STATUS_CONFIG[item.status] ??
-                  STATUS_CONFIG.sufficient
-
                 return (
                   <article
                     key={item.publicationId}
                     style={{
                       padding: 18,
                       borderRadius: 18,
-                      border: `1px solid ${status.border}`,
-                      background: status.background,
+                      border: '1px solid #e5e7eb',
+                      background: '#ffffff',
                       boxShadow:
                         '0 8px 24px rgba(15, 23, 42, 0.06)',
                     }}
@@ -194,7 +167,7 @@ function Dashboard({
       marginBottom: 8,
     }}
   >
-    Stock après distribution
+    Stock restant
   </div>
 
   <div
@@ -219,24 +192,7 @@ function Dashboard({
       : 'exemplaire'}
   </div>
 </div>
-
-                      <div
-                        style={{
-                          marginTop: 16,
-                          color: status.color,
-                          fontWeight: 800,
-                        }}
-                      >
-                        {status.icon}{' '}
-                        {item.status === 'insufficient'
-                          ? `Il manque ${item.missingQuantity} ${
-                              item.missingQuantity > 1
-                                ? 'exemplaires'
-                                : 'exemplaire'
-                            }`
-                          : status.label}
-                      </div>
-                    </button>
+</button>
                   </article>
                 )
               })}
