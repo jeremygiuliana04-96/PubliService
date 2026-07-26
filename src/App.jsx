@@ -191,6 +191,7 @@ function App() {
   const [publishers, setPublishers] = useState([])
   const [pendingDistributions, setPendingDistributions] =
     useState([])
+  const [stockOverview, setStockOverview] = useState([])
 
   useEffect(() => {
     let active = true
@@ -276,6 +277,7 @@ function App() {
       setPendingDistributions(
         data?.pendingDistributions ?? [],
       )
+      setStockOverview(data?.stockOverview ?? [])
     }
 
     if (!navigator.onLine) {
@@ -483,6 +485,7 @@ function App() {
       setMovements([])
       setPublishers([])
       setPendingDistributions([])
+      setStockOverview([])
       setDataError('')
     })
 
@@ -540,6 +543,35 @@ function App() {
     }
   }, [currentAssembly, loadData])
 
+  useEffect(() => {
+    if (
+      !currentAssembly?.id ||
+      stockOverview.length === 0
+    ) {
+      return
+    }
+
+    saveAssemblyCache(currentAssembly.id, {
+      publications,
+      movements,
+      publishers,
+      pendingDistributions,
+      stockOverview,
+    }).catch((cacheError) => {
+      console.warn(
+        'Impossible de sauvegarder l’état du stock :',
+        cacheError,
+      )
+    })
+  }, [
+    currentAssembly?.id,
+    publications,
+    movements,
+    publishers,
+    pendingDistributions,
+    stockOverview,
+  ])
+
   const handleSelectAssembly = async (assembly) => {
     setCurrentAssembly(assembly)
 
@@ -572,6 +604,7 @@ function App() {
     nextMovements = movements,
     nextPublishers = publishers,
     nextPendingDistributions = pendingDistributions,
+    nextStockOverview = stockOverview,
   } = {}) => {
     if (!currentAssembly?.id) return
 
@@ -581,6 +614,7 @@ function App() {
         movements: nextMovements,
         publishers: nextPublishers,
         pendingDistributions: nextPendingDistributions,
+        stockOverview: nextStockOverview,
       })
     } catch (cacheError) {
       console.warn(
@@ -825,6 +859,7 @@ function App() {
         movements,
         publishers,
         pendingDistributions,
+        stockOverview,
       },
       queuedOperations,
     )
@@ -943,6 +978,7 @@ function App() {
       setMovements([])
       setPublishers([])
       setPendingDistributions([])
+      setStockOverview([])
       setUsingCachedData(false)
       setDataError('')
       setScreen('welcome')
@@ -1035,10 +1071,12 @@ function App() {
       <Dashboard
         publications={publications}
         publishers={publishers}
-        pendingDistributions={pendingDistributions}
+        cachedStockOverview={stockOverview}
+        onStockOverviewChange={setStockOverview}
         currentAssembly={currentAssembly}
         onNavigate={setScreen}
         isAdmin={isAdmin}
+        isOnline={isOnline && !usingCachedData}
       />
     ),
 

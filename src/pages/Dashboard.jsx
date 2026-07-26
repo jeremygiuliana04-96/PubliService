@@ -9,23 +9,37 @@ const formatDate = (value) =>
     month: 'long',
   }).format(value)
 
+const sameOverview = (left, right) =>
+  JSON.stringify(left ?? []) === JSON.stringify(right ?? [])
 
 function Dashboard({
   publications = [],
   publishers = [],
-  pendingDistributions = [],
+  cachedStockOverview = [],
+  onStockOverviewChange,
   currentAssembly,
   onNavigate,
   isAdmin = false,
+  isOnline = true,
 }) {
-  const [stockOverview, setStockOverview] = useState([])
-  const [overviewLoading, setOverviewLoading] = useState(true)
+  const [stockOverview, setStockOverview] = useState(
+    cachedStockOverview,
+  )
+  const [overviewLoading, setOverviewLoading] =
+    useState(isOnline)
   const [overviewError, setOverviewError] = useState('')
 
   useEffect(() => {
     let cancelled = false
 
     async function loadOverview() {
+      if (!isOnline) {
+        setStockOverview(cachedStockOverview)
+        setOverviewLoading(false)
+        setOverviewError('')
+        return
+      }
+
       try {
         setOverviewLoading(true)
         setOverviewError('')
@@ -33,12 +47,15 @@ function Dashboard({
         const overview = await getStockOverview({
           publishers,
           publications,
-          pendingDistributions,
           currentAssembly,
         })
 
         if (!cancelled) {
           setStockOverview(overview)
+
+          if (!sameOverview(overview, cachedStockOverview)) {
+            onStockOverviewChange?.(overview)
+          }
         }
       } catch (error) {
         console.error(
@@ -47,11 +64,16 @@ function Dashboard({
         )
 
         if (!cancelled) {
-          setStockOverview([])
-          setOverviewError(
-            error?.message ??
-              'Impossible de charger l’état du stock.',
-          )
+          if (cachedStockOverview.length > 0) {
+            setStockOverview(cachedStockOverview)
+            setOverviewError('')
+          } else {
+            setStockOverview([])
+            setOverviewError(
+              error?.message ??
+                'Impossible de charger l’état du stock.',
+            )
+          }
         }
       } finally {
         if (!cancelled) {
@@ -68,8 +90,10 @@ function Dashboard({
   }, [
     publishers,
     publications,
-    pendingDistributions,
+    cachedStockOverview,
     currentAssembly,
+    isOnline,
+    onStockOverviewChange,
   ])
 
 

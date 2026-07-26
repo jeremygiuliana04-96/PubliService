@@ -40,6 +40,9 @@ function normalizeCache(cache, assemblyId) {
     )
       ? cache.pendingDistributions
       : [],
+    stockOverview: Array.isArray(cache.stockOverview)
+      ? cache.stockOverview
+      : [],
   }
 }
 
@@ -50,6 +53,7 @@ export async function saveAssemblyCache(
     movements = [],
     publishers = [],
     pendingDistributions = [],
+    stockOverview = [],
   } = {},
 ) {
   const key = createCacheKey(assemblyId)
@@ -61,6 +65,7 @@ export async function saveAssemblyCache(
     movements,
     publishers,
     pendingDistributions,
+    stockOverview,
     savedAt: new Date().toISOString(),
   }
 
