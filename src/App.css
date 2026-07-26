@@ -1563,9 +1563,9 @@ button { -webkit-tap-highlight-color: transparent; }
 /* Mode hors ligne et synchronisation */
 .offline-status-stack {
   position: fixed;
-  top: max(10px, env(safe-area-inset-top));
+  top: calc(env(safe-area-inset-top, 0px) + 76px);
   left: 50%;
-  z-index: 100;
+  z-index: 40;
   display: grid;
   width: min(calc(100% - 24px), 620px);
   gap: 8px;
@@ -1633,7 +1633,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 @media (max-width: 520px) {
   .offline-status-stack {
-    top: max(8px, env(safe-area-inset-top));
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
     width: calc(100% - 16px);
   }
 }
