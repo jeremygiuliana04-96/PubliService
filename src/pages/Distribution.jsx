@@ -1,21 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import SideMenu from '../components/SideMenu'
-import {
-  distributeAllRemaining,
-  getPendingDistributions,
-} from '../services/distributionService'
 
 function Distribution({
   currentAssembly = null,
+  pendingDistributions = [],
+  onSaveDistribution,
   onNavigate,
   isAdmin = false,
+  isOnline = true,
 }) {
   const [search, setSearch] = useState('')
-  const [pendingRows, setPendingRows] = useState([])
   const [selectedRows, setSelectedRows] = useState({})
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
+  const pendingRows = pendingDistributions
 
   const assemblyId =
     currentAssembly?.id ??
@@ -26,49 +23,6 @@ function Distribution({
     currentAssembly?.accessCode ??
     currentAssembly?.access_code ??
     currentAssembly?.code
-
-  const loadDistribution = useCallback(async () => {
-    if (!assemblyId || !accessCode) {
-      setPendingRows([])
-      setSelectedRows({})
-      setLoading(false)
-      setErrorMessage(
-        'Les informations de l’assemblée sont introuvables.',
-      )
-      return
-    }
-
-    try {
-      setLoading(true)
-      setErrorMessage('')
-
-      const rows = await getPendingDistributions(
-        assemblyId,
-        accessCode,
-      )
-
-      setPendingRows(rows)
-      setSelectedRows({})
-    } catch (error) {
-      console.error(
-        'Erreur lors du chargement de la distribution :',
-        error,
-      )
-
-      setPendingRows([])
-      setSelectedRows({})
-      setErrorMessage(
-        error?.message ??
-          'Impossible de charger la distribution.',
-      )
-    } finally {
-      setLoading(false)
-    }
-  }, [assemblyId, accessCode])
-
-  useEffect(() => {
-    loadDistribution()
-  }, [loadDistribution])
 
   const publishers = useMemo(() => {
     const grouped = new Map()
@@ -183,22 +137,17 @@ function Distribution({
 
     try {
       setSaving(true)
-      setErrorMessage('')
-
-      for (const row of selectedPendingRows) {
-        await distributeAllRemaining({
-          assemblyId,
-          accessCode,
-          publisherId: row.publisherId,
-          publicationId: row.publicationId,
-        })
-      }
-
-      window.alert(
-        'La distribution a bien été enregistrée.',
+      const result = await onSaveDistribution(
+        selectedPendingRows,
       )
 
-      await loadDistribution()
+      window.alert(
+        result?.queued
+          ? 'La distribution est enregistrée hors ligne. Elle sera synchronisée automatiquement.'
+          : 'La distribution a bien été enregistrée.',
+      )
+
+      setSelectedRows({})
     } catch (error) {
       console.error(
         'Erreur lors de l’enregistrement :',
@@ -209,8 +158,6 @@ function Distribution({
         error?.message ??
           'Impossible d’enregistrer la distribution.',
       )
-
-      await loadDistribution()
     } finally {
       setSaving(false)
     }
@@ -252,13 +199,7 @@ function Distribution({
           }
         />
 
-        {errorMessage && (
-          <p className="error-message">{errorMessage}</p>
-        )}
-
-        {loading ? (
-          <p>Chargement...</p>
-        ) : filteredPublishers.length === 0 ? (
+        {filteredPublishers.length === 0 ? (
           <div
             className="publication-card"
             style={{ padding: 18 }}
@@ -486,10 +427,10 @@ function Distribution({
           type="button"
           disabled={
             saving ||
-            loading ||
             selectedPendingRows.length === 0 ||
             !assemblyId ||
-            !accessCode
+            !accessCode ||
+            !onSaveDistribution
           }
           onClick={handleSave}
           style={{
@@ -500,7 +441,7 @@ function Distribution({
         >
           {saving
             ? 'Enregistrement...'
-            : `Enregistrer la distribution${
+            : `${isOnline ? 'Enregistrer la distribution' : 'Enregistrer hors ligne'}${
                 selectedPendingRows.length > 0
                   ? ` (${selectedPendingRows.length})`
                   : ''

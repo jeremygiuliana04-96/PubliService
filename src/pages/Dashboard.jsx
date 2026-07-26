@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import SideMenu from '../components/SideMenu'
 import { getStockOverview } from '../services/dashboardService'
 
@@ -13,6 +13,7 @@ const formatDate = (value) =>
 function Dashboard({
   publications = [],
   publishers = [],
+  pendingDistributions = [],
   currentAssembly,
   onNavigate,
   isAdmin = false,
@@ -32,6 +33,7 @@ function Dashboard({
         const overview = await getStockOverview({
           publishers,
           publications,
+          pendingDistributions,
           currentAssembly,
         })
 
@@ -63,7 +65,12 @@ function Dashboard({
     return () => {
       cancelled = true
     }
-  }, [publishers, publications, currentAssembly])
+  }, [
+    publishers,
+    publications,
+    pendingDistributions,
+    currentAssembly,
+  ])
 
 
   return (

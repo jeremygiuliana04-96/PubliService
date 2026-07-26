@@ -7,11 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: [
-        'favicon.ico',
-        'favicon-32.png',
-        'apple-touch-icon.png',
-      ],
+      injectRegister: 'auto',
       manifest: {
         name: 'PubliService',
         short_name: 'PubliService',
@@ -19,6 +15,7 @@ export default defineConfig({
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
+        id: '/',
         start_url: '/',
         scope: '/',
         orientation: 'portrait',
@@ -34,6 +31,21 @@ export default defineConfig({
             type: 'image/png',
           },
         ],
+      },
+      workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        navigateFallback: 'index.html',
+        globPatterns: [
+          '**/*.{js,css,html,ico,png,svg,webmanifest}',
+        ],
+        globIgnores: [
+          '**/icon-192.png',
+          '**/icon-512.png',
+          '**/manifest.webmanifest',
+        ],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
   ],

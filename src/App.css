@@ -1559,3 +1559,81 @@ button { -webkit-tap-highlight-color: transparent; }
   color: #0f172a;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.1);
 }
+
+/* Mode hors ligne et synchronisation */
+.offline-status-stack {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 100;
+  display: grid;
+  width: min(calc(100% - 24px), 620px);
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.offline-status-stack:empty {
+  display: none;
+}
+
+.offline-banner,
+.sync-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  color: #172033;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+  pointer-events: auto;
+}
+
+.offline-banner {
+  background: #fff7dc;
+}
+
+.sync-banner {
+  background: #eaf3ff;
+}
+
+.offline-banner strong,
+.offline-banner span,
+.sync-banner strong,
+.sync-banner span {
+  display: block;
+}
+
+.offline-banner strong,
+.sync-banner strong {
+  font-size: 13px;
+}
+
+.offline-banner span,
+.sync-banner span {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.72;
+}
+
+.sync-banner button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(10, 77, 168, 0.28);
+  border-radius: 10px;
+  color: var(--blue-900);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .offline-status-stack {
+    top: max(8px, env(safe-area-inset-top));
+    width: calc(100% - 16px);
+  }
+}

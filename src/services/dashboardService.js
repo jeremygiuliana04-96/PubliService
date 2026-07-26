@@ -14,38 +14,44 @@ export async function getStockOverview({
   publishers = [],
   publications = [],
   currentAssembly = null,
+  pendingDistributions = null,
 }) {
-  const assemblyId = getAssemblyId(currentAssembly)
-  const accessCode = getAccessCode(currentAssembly)
+  let distributionRows = pendingDistributions
 
-  if (!assemblyId || !accessCode) {
-    throw new Error(
-      'Les informations de l’assemblée sont introuvables.',
-    )
-  }
+  if (!Array.isArray(distributionRows)) {
+    const assemblyId = getAssemblyId(currentAssembly)
+    const accessCode = getAccessCode(currentAssembly)
 
-  const publisherRows = await Promise.all(
-    publishers.map((publisher) =>
-      getPublisherPublications(
-        publisher.id,
-        assemblyId,
-        accessCode,
+    if (!assemblyId || !accessCode) {
+      throw new Error(
+        'Les informations de l’assemblée sont introuvables.',
+      )
+    }
+
+    const publisherRows = await Promise.all(
+      publishers.map((publisher) =>
+        getPublisherPublications(
+          publisher.id,
+          assemblyId,
+          accessCode,
+        ),
       ),
-    ),
-  )
+    )
+
+    distributionRows = publisherRows.flat()
+  }
 
   const remainingByPublication = new Map()
 
-  publisherRows.flat().forEach((row) => {
-    const ordered = Math.max(
-      0,
-      Number(row.orderedQuantity ?? 0),
-    )
-    const distributed = Math.max(
-      0,
-      Number(row.distributedQuantity ?? 0),
-    )
-    const remaining = Math.max(0, ordered - distributed)
+  distributionRows.forEach((row) => {
+    const remaining =
+      row.remainingQuantity == null
+        ? Math.max(
+            0,
+            Number(row.orderedQuantity ?? 0) -
+              Number(row.distributedQuantity ?? 0),
+          )
+        : Math.max(0, Number(row.remainingQuantity) || 0)
     const key = String(row.publicationId)
 
     remainingByPublication.set(

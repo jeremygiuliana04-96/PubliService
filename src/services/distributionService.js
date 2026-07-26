@@ -108,9 +108,13 @@ export async function distributePublication({
     throw new Error(error.message)
   }
 
-  return Array.isArray(data)
-    ? mapDistribution(data[0])
-    : mapDistribution(data)
+  const distribution = Array.isArray(data)
+    ? data[0]
+    : data
+
+  return distribution
+    ? mapDistribution(distribution)
+    : null
 }
 
 export async function distributeAllRemaining({
@@ -138,7 +142,11 @@ export async function distributeAllRemaining({
     throw new Error(error.message)
   }
 
-  return Array.isArray(data)
-    ? mapDistribution(data[0])
-    : mapDistribution(data)
+  const distribution = Array.isArray(data)
+    ? data[0]
+    : data
+
+  return distribution
+    ? mapDistribution(distribution)
+    : null
 }
