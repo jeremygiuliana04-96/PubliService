@@ -104,6 +104,9 @@ export async function enqueueDistributionOperation({
     publicationName,
     publisherName,
     createdAt: new Date().toISOString(),
+    attempts: 0,
+    lastAttemptAt: null,
+    lastError: '',
   }
   const key = operationKey(operation)
   const existing = operations.find(
@@ -134,6 +137,28 @@ export async function removeOfflineOperation(operationId) {
   if (nextOperations.length !== operations.length) {
     await writeQueue(nextOperations)
   }
+
+  return nextOperations
+}
+
+export async function markOfflineOperationFailed(
+  operationId,
+  errorMessage,
+) {
+  const operations = await readQueue()
+  const nextOperations = operations.map((operation) =>
+    operation.id === operationId
+      ? {
+          ...operation,
+          attempts: (Number(operation.attempts) || 0) + 1,
+          lastAttemptAt: new Date().toISOString(),
+          lastError:
+            errorMessage || 'La synchronisation a échoué.',
+        }
+      : operation,
+  )
+
+  await writeQueue(nextOperations)
 
   return nextOperations
 }

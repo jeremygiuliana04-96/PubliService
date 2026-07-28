@@ -5,11 +5,16 @@ import AssemblyLogin from './pages/AssemblyLogin'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
 import More from './pages/More'
+import AppInformation from './pages/AppInformation'
+import InstallationGuide from './pages/InstallationGuide'
+import SyncStatus from './pages/SyncStatus'
+import Administration from './pages/Administration'
 import AdminPanel from './pages/AdminPanel'
 import Publishers from './pages/Publishers'
 import Assemblies from './pages/Assemblies'
 import Distribution from './pages/Distribution'
 import AuthLoader from './components/AuthLoader'
+import PwaUpdatePrompt from './components/PwaUpdatePrompt'
 import { signOutAdministrator } from './lib/auth'
 import { supabase } from './lib/supabase'
 import {
@@ -31,6 +36,10 @@ import {
   updatePublicationStock,
 } from './services/publicationService'
 import {
+  createPublicationCatalogEntry,
+  getPublicationCatalog,
+} from './services/publicationCatalogService'
+import {
   createStockMovement,
   getStockMovements,
 } from './services/movementService'
@@ -49,12 +58,66 @@ import {
   countOfflineOperations,
   enqueueDistributionOperation,
   listOfflineOperations,
+  removeOfflineOperation,
 } from './offline/queue'
 import { syncOfflineOperations } from './offline/sync'
 import { getPendingDistributions } from './services/distributionService'
 import './App.css'
 
 const ACTIVE_ASSEMBLY_STORAGE_KEY = 'publiservice-active-assembly-id'
+const SYNC_METADATA_PREFIX = 'publiservice-sync-metadata'
+
+function syncMetadataKey(assemblyId) {
+  return `${SYNC_METADATA_PREFIX}:${String(assemblyId)}`
+}
+
+function readSyncMetadata(assemblyId) {
+  if (!assemblyId) {
+    return {
+      lastSyncAt: null,
+      lastSyncError: '',
+    }
+  }
+
+  try {
+    const stored = localStorage.getItem(
+      syncMetadataKey(assemblyId),
+    )
+
+    if (!stored) {
+      return {
+        lastSyncAt: null,
+        lastSyncError: '',
+      }
+    }
+
+    const metadata = JSON.parse(stored)
+
+    return {
+      lastSyncAt: metadata?.lastSyncAt ?? null,
+      lastSyncError: metadata?.lastSyncError ?? '',
+    }
+  } catch {
+    return {
+      lastSyncAt: null,
+      lastSyncError: '',
+    }
+  }
+}
+
+function saveSyncMetadata(assemblyId, updates) {
+  const nextMetadata = {
+    ...readSyncMetadata(assemblyId),
+    ...updates,
+  }
+
+  localStorage.setItem(
+    syncMetadataKey(assemblyId),
+    JSON.stringify(nextMetadata),
+  )
+
+  return nextMetadata
+}
 
 const getAssemblyAccessCode = (assembly) =>
   assembly?.code ??
@@ -181,12 +244,17 @@ function App() {
   )
   const [usingCachedData, setUsingCachedData] = useState(false)
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
+  const [pendingSyncOperations, setPendingSyncOperations] =
+    useState([])
   const [syncStatus, setSyncStatus] = useState('idle')
+  const [lastSyncAt, setLastSyncAt] = useState(null)
+  const [lastSyncError, setLastSyncError] = useState('')
 
   const [assemblies, setAssemblies] = useState([])
   const [currentAssembly, setCurrentAssembly] = useState(null)
 
   const [publications, setPublications] = useState([])
+  const [publicationCatalog, setPublicationCatalog] = useState([])
   const [movements, setMovements] = useState([])
   const [publishers, setPublishers] = useState([])
   const [pendingDistributions, setPendingDistributions] =
@@ -260,6 +328,7 @@ function App() {
     setDataError('')
 
     let cachedData = null
+    let syncFailureMessage = ''
 
     try {
       cachedData = await getAssemblyCache(assemblyId)
@@ -270,8 +339,21 @@ function App() {
       )
     }
 
+    try {
+      const queuedOperations = await listOfflineOperations()
+
+      setPendingSyncOperations(queuedOperations)
+      setPendingSyncCount(queuedOperations.length)
+    } catch (queueError) {
+      console.warn(
+        'Impossible de lire la file de synchronisation :',
+        queueError,
+      )
+    }
+
     const applyData = (data) => {
       setPublications(data?.publications ?? [])
+      setPublicationCatalog(data?.publicationCatalog ?? [])
       setMovements(data?.movements ?? [])
       setPublishers(data?.publishers ?? [])
       setPendingDistributions(
@@ -313,9 +395,15 @@ function App() {
               : null,
           })
 
-          setPendingSyncCount(
-            await countOfflineOperations(),
-          )
+          const operationsAfterSync =
+            await listOfflineOperations()
+
+          setPendingSyncOperations(operationsAfterSync)
+          setPendingSyncCount(operationsAfterSync.length)
+
+          syncFailureMessage =
+            syncResult.failed[0]?.error ?? ''
+
           setSyncStatus(
             syncResult.failed.length > 0 ? 'error' : 'idle',
           )
@@ -324,11 +412,19 @@ function App() {
 
       const [
         nextPublications,
+        nextPublicationCatalog,
         nextMovements,
         nextPublishers,
         nextPendingDistributions,
       ] = await Promise.all([
         getPublications(assemblyId),
+        getPublicationCatalog(assemblyId).catch((catalogError) => {
+          console.warn(
+            'Catalogue des publications indisponible :',
+            catalogError,
+          )
+          return cachedData?.publicationCatalog ?? []
+        }),
         getStockMovements(assemblyId),
         getPublishers(assemblyId),
         accessCode
@@ -343,19 +439,52 @@ function App() {
 
       const serverData = {
         publications: nextPublications,
+        publicationCatalog: nextPublicationCatalog,
         movements: nextMovements,
         publishers: nextPublishers,
         pendingDistributions: nextPendingDistributions,
       }
-      const remainingOperations =
+      const remainingAssemblyOperations =
         await listOfflineOperations(assemblyId)
       const freshData = applyQueuedDistributions(
         serverData,
-        remainingOperations,
+        remainingAssemblyOperations,
       )
+      const remainingOperations =
+        await listOfflineOperations()
 
       applyData(freshData)
       setUsingCachedData(false)
+      setPendingSyncOperations(remainingOperations)
+      setPendingSyncCount(remainingOperations.length)
+
+      if (
+        syncFailureMessage ||
+        remainingAssemblyOperations.length > 0
+      ) {
+        const errorMessage =
+          syncFailureMessage ||
+          remainingAssemblyOperations.find(
+            (operation) => operation.lastError,
+          )?.lastError ||
+          'Certaines opérations restent en attente de synchronisation.'
+
+        setSyncStatus('error')
+        setLastSyncError(errorMessage)
+        saveSyncMetadata(assemblyId, {
+          lastSyncError: errorMessage,
+        })
+      } else {
+        const syncedAt = new Date().toISOString()
+
+        setSyncStatus('idle')
+        setLastSyncAt(syncedAt)
+        setLastSyncError('')
+        saveSyncMetadata(assemblyId, {
+          lastSyncAt: syncedAt,
+          lastSyncError: '',
+        })
+      }
 
       try {
         await saveAssemblyCache(assemblyId, freshData)
@@ -366,6 +495,16 @@ function App() {
         )
       }
     } catch (error) {
+      const errorMessage =
+        error?.message ??
+        'Impossible de synchroniser les données.'
+
+      setSyncStatus('error')
+      setLastSyncError(errorMessage)
+      saveSyncMetadata(assemblyId, {
+        lastSyncError: errorMessage,
+      })
+
       if (cachedData) {
         console.warn(
           'Supabase est indisponible. Utilisation du cache local :',
@@ -375,10 +514,7 @@ function App() {
         setUsingCachedData(true)
         setDataError('')
       } else {
-        setDataError(
-          error?.message ??
-            'Impossible de charger les données.',
-        )
+        setDataError(errorMessage)
       }
     } finally {
       setDataLoading(false)
@@ -482,6 +618,7 @@ function App() {
       setAssemblies([])
       setCurrentAssembly(null)
       setPublications([])
+      setPublicationCatalog([])
       setMovements([])
       setPublishers([])
       setPendingDistributions([])
@@ -503,10 +640,11 @@ function App() {
     let active = true
 
     const refreshPendingCount = async () => {
-      const count = await countOfflineOperations()
+      const operations = await listOfflineOperations()
 
       if (active) {
-        setPendingSyncCount(count)
+        setPendingSyncOperations(operations)
+        setPendingSyncCount(operations.length)
       }
     }
 
@@ -522,15 +660,35 @@ function App() {
       setUsingCachedData(true)
       setSyncStatus('idle')
     }
+    const handleQueueChanged = () => {
+      refreshPendingCount().catch((error) => {
+        console.warn(
+          'Actualisation de la file de synchronisation impossible :',
+          error,
+        )
+      })
+    }
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
     window.addEventListener(
       OFFLINE_QUEUE_CHANGED_EVENT,
-      refreshPendingCount,
+      handleQueueChanged,
     )
 
-    refreshPendingCount()
+    const metadata = readSyncMetadata(
+      currentAssembly?.id,
+    )
+
+    setLastSyncAt(metadata.lastSyncAt)
+    setLastSyncError(metadata.lastSyncError)
+
+    refreshPendingCount().catch((error) => {
+      console.warn(
+        'Actualisation de la file de synchronisation impossible :',
+        error,
+      )
+    })
 
     return () => {
       active = false
@@ -538,7 +696,7 @@ function App() {
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener(
         OFFLINE_QUEUE_CHANGED_EVENT,
-        refreshPendingCount,
+        handleQueueChanged,
       )
     }
   }, [currentAssembly, loadData])
@@ -553,6 +711,7 @@ function App() {
 
     saveAssemblyCache(currentAssembly.id, {
       publications,
+      publicationCatalog,
       movements,
       publishers,
       pendingDistributions,
@@ -566,6 +725,7 @@ function App() {
   }, [
     currentAssembly?.id,
     publications,
+    publicationCatalog,
     movements,
     publishers,
     pendingDistributions,
@@ -601,6 +761,7 @@ function App() {
 
   const persistCurrentData = async ({
     nextPublications = publications,
+    nextPublicationCatalog = publicationCatalog,
     nextMovements = movements,
     nextPublishers = publishers,
     nextPendingDistributions = pendingDistributions,
@@ -611,6 +772,7 @@ function App() {
     try {
       await saveAssemblyCache(currentAssembly.id, {
         publications: nextPublications,
+        publicationCatalog: nextPublicationCatalog,
         movements: nextMovements,
         publishers: nextPublishers,
         pendingDistributions: nextPendingDistributions,
@@ -646,6 +808,23 @@ function App() {
       nextPublications,
       nextMovements,
     })
+
+    return created
+  }
+
+  const addPublicationCatalogEntry = async ({ name, hasDate }) => {
+    const created = await createPublicationCatalogEntry({
+      assemblyId: currentAssembly?.id,
+      name,
+      hasDate,
+    })
+    const nextPublicationCatalog = [
+      ...publicationCatalog,
+      created,
+    ].sort((left, right) => left.name.localeCompare(right.name, 'fr'))
+
+    setPublicationCatalog(nextPublicationCatalog)
+    await persistCurrentData({ nextPublicationCatalog })
 
     return created
   }
@@ -856,6 +1035,7 @@ function App() {
     const optimisticData = applyQueuedDistributions(
       {
         publications,
+        publicationCatalog,
         movements,
         publishers,
         pendingDistributions,
@@ -902,9 +1082,11 @@ function App() {
       },
     })
 
-    setPendingSyncCount(
-      await countOfflineOperations(),
-    )
+    const operationsAfterSync =
+      await listOfflineOperations()
+
+    setPendingSyncOperations(operationsAfterSync)
+    setPendingSyncCount(operationsAfterSync.length)
     setSyncStatus(
       syncResult.failed.length > 0 ? 'error' : 'idle',
     )
@@ -919,6 +1101,31 @@ function App() {
           currentAssembly.id,
         )) > 0,
     }
+  }
+
+  const handleRetrySynchronization = async () => {
+    if (!navigator.onLine || !currentAssembly?.id) return
+
+    setSyncStatus('syncing')
+    setLastSyncError('')
+
+    await loadData(currentAssembly)
+  }
+
+  const handleCancelSyncOperation = async (operationId) => {
+    if (!navigator.onLine || !currentAssembly?.id) return
+
+    await removeOfflineOperation(operationId)
+
+    const remainingOperations =
+      await listOfflineOperations()
+
+    setPendingSyncOperations(remainingOperations)
+    setPendingSyncCount(remainingOperations.length)
+
+    await loadData(currentAssembly, {
+      skipSync: true,
+    })
   }
 
   const handleAssemblyLogin = async (code) => {
@@ -975,11 +1182,17 @@ function App() {
       setAssemblies([])
       setCurrentAssembly(null)
       setPublications([])
+      setPublicationCatalog([])
       setMovements([])
       setPublishers([])
       setPendingDistributions([])
       setStockOverview([])
       setUsingCachedData(false)
+      setPendingSyncOperations([])
+      setPendingSyncCount(0)
+      setSyncStatus('idle')
+      setLastSyncAt(null)
+      setLastSyncError('')
       setDataError('')
       setScreen('welcome')
     } catch (error) {
@@ -1006,7 +1219,10 @@ function App() {
     screen === 'distribution' ||
     screen === 'publishers' ||
     screen === 'assemblies' ||
+    screen === 'administration' ||
     screen === 'more' ||
+    screen === 'syncStatus' ||
+    screen === 'installation' ||
     screen === 'adminPanel'
 
   if (protectedScreen && !session && !assemblySession) {
@@ -1033,12 +1249,21 @@ function App() {
 
   const adminOnlyScreen =
     screen === 'assemblies' ||
+    screen === 'administration' ||
     screen === 'adminPanel'
 
   const visibleScreen =
     isAssembly && adminOnlyScreen
       ? 'dashboard'
       : screen
+
+  const currentSyncOperations = currentAssembly?.id
+    ? pendingSyncOperations.filter(
+        (operation) =>
+          String(operation.assemblyId) ===
+          String(currentAssembly.id),
+      )
+    : pendingSyncOperations
 
   const screens = {
     welcome: (
@@ -1071,21 +1296,26 @@ function App() {
       <Dashboard
         publications={publications}
         publishers={publishers}
+        pendingDistributions={pendingDistributions}
         cachedStockOverview={stockOverview}
         onStockOverviewChange={setStockOverview}
         currentAssembly={currentAssembly}
         onNavigate={setScreen}
         isAdmin={isAdmin}
         isOnline={isOnline && !usingCachedData}
+        pendingSyncCount={currentSyncOperations.length}
+        syncStatus={syncStatus}
       />
     ),
 
     inventory: (
       <Inventory
         publications={publications}
+        publicationCatalog={publicationCatalog}
         movements={movements}
         currentAssembly={currentAssembly}
         onAdd={addPublication}
+        onAddCatalogEntry={addPublicationCatalogEntry}
         onChangeStock={changeStock}
         onDelete={removePublication}
         onNavigate={setScreen}
@@ -1129,8 +1359,9 @@ function App() {
 
     more: (
       <More
-        currentAssembly={currentAssembly}
-        publisherCount={publishers.length}
+        pendingSyncCount={currentSyncOperations.length}
+        syncStatus={syncStatus}
+        lastSyncAt={lastSyncAt}
         onNavigate={setScreen}
         onLogout={handleLogout}
         logoutLoading={logoutLoading}
@@ -1138,13 +1369,82 @@ function App() {
       />
     ),
 
+    administration: (
+      <Administration
+        currentAssembly={currentAssembly}
+        publisherCount={publishers.length}
+        onNavigate={setScreen}
+      />
+    ),
+
+    syncStatus: (
+      <SyncStatus
+        currentAssembly={currentAssembly}
+        isOnline={isOnline}
+        usingCachedData={usingCachedData}
+        syncStatus={syncStatus}
+        operations={currentSyncOperations}
+        lastSyncAt={lastSyncAt}
+        lastSyncError={lastSyncError}
+        onRetry={handleRetrySynchronization}
+        onCancel={handleCancelSyncOperation}
+        onBack={() => setScreen('more')}
+      />
+    ),
+
+    installation: (
+      <InstallationGuide
+        onBack={() => setScreen('more')}
+      />
+    ),
+
+    privacy: (
+      <AppInformation
+        document="privacy"
+        onBack={() =>
+          setScreen(session || assemblySession ? 'more' : 'welcome')
+        }
+      />
+    ),
+
+    terms: (
+      <AppInformation
+        document="terms"
+        onBack={() =>
+          setScreen(session || assemblySession ? 'more' : 'welcome')
+        }
+      />
+    ),
+
+    releaseNotes: (
+      <AppInformation
+        document="releaseNotes"
+        onBack={() =>
+          setScreen(session || assemblySession ? 'more' : 'welcome')
+        }
+      />
+    ),
+
+    support: (
+      <AppInformation
+        document="support"
+        onBack={() =>
+          setScreen(session || assemblySession ? 'more' : 'welcome')
+        }
+      />
+    ),
+
     adminPanel: (
-      <AdminPanel onBack={() => setScreen('more')} />
+      <AdminPanel
+        onBack={() => setScreen('administration')}
+      />
     ),
   }
 
   return (
     <main className="app-shell">
+      <PwaUpdatePrompt />
+
       <div
         className="offline-status-stack"
         aria-live="polite"

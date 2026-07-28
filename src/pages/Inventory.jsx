@@ -12,14 +12,17 @@ const formatMovementDate = (value) =>
   }).format(new Date(value))
 
 const LANGUAGES = [
-  'Français',
-  'Néerlandais',
-  'Anglais',
-  'Espagnol',
-  'Italien',
+  { value: 'fr', label: 'Français' },
+  { value: 'nl', label: 'Néerlandais' },
+  { value: 'en', label: 'Anglais' },
+  { value: 'es', label: 'Espagnol' },
+  { value: 'it', label: 'Italien' },
 ]
 
-const FORMATS = ['Standard', 'Grand Caractère']
+const FORMATS = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'large', label: 'Grand caractère' },
+]
 
 const MONTHS = [
   { value: '01', label: 'Janvier' },
@@ -38,24 +41,194 @@ const MONTHS = [
 
 const YEARS = Array.from({ length: 25 }, (_, index) => 2026 + index)
 
+const DEFAULT_PUBLICATION_NAMES = [
+  'Cahier Vie et ministère',
+  'Tour de Garde d’étude',
+  'Tour de Garde publique',
+  'Réveillez-vous !',
+]
+
+const normalizeText = (value) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('fr')
+
+const getPublicationBaseName = (publication) => {
+  const name = String(publication.name ?? '').trim()
+  const normalizedName = normalizeText(name)
+
+  if (
+    normalizedName.includes('cahier') &&
+    (normalizedName.includes('vie') ||
+      normalizedName.includes('ministere'))
+  ) {
+    return 'Cahier Vie et ministère'
+  }
+
+  if (
+    normalizedName.includes('tour de garde') &&
+    (normalizedName.includes('publique') ||
+      normalizedName.includes('public'))
+  ) {
+    return 'Tour de Garde publique'
+  }
+
+  if (normalizedName.includes('tour de garde')) {
+    return 'Tour de Garde d’étude'
+  }
+
+  if (
+    normalizedName.includes('reveillez-vous') ||
+    normalizedName.includes('reveillez vous')
+  ) {
+    return 'Réveillez-vous !'
+  }
+
+  const languagePattern =
+    '(Français|Néerlandais|Anglais|Espagnol|Italien)'
+  const formatPattern =
+    '(Standard|Grand caractère|Grands caractères|Large)'
+
+  const baseName = name
+    .replace(
+      /\s+-\s+(?:\d{1,2}\/\d{4}|[A-Za-zÀ-ÖØ-öø-ÿ]+\s+\d{4})\s*$/u,
+      '',
+    )
+    .replace(
+      new RegExp(`\\s+-\\s+${formatPattern}\\s*$`, 'iu'),
+      '',
+    )
+    .replace(
+      new RegExp(
+        `\\s+-\\s+${languagePattern}(?:\\s*\\([^)]*\\))?\\s*$`,
+        'iu',
+      ),
+      '',
+    )
+    .trim()
+
+  return baseName || name || 'Autres publications'
+}
+
+const getPublicationCategory = (publication) => {
+  const type = normalizeText(publication.publicationType)
+  const name = normalizeText(publication.name)
+
+  if (
+    type === 'workbook' ||
+    (name.includes('cahier') &&
+      (name.includes('vie') || name.includes('ministere')))
+  ) {
+    return {
+      value: 'workbook',
+      label: 'Cahier Vie et ministère',
+      order: 0,
+    }
+  }
+
+  if (
+    type === 'public_watchtower' ||
+    (name.includes('tour de garde') &&
+      (name.includes('publique') || name.includes('public')))
+  ) {
+    return {
+      value: 'public_watchtower',
+      label: 'Tour de Garde publique',
+      order: 2,
+    }
+  }
+
+  if (type === 'watchtower' || name.includes('tour de garde')) {
+    return {
+      value: 'watchtower',
+      label: 'Tour de Garde d’étude',
+      order: 1,
+    }
+  }
+
+  if (
+    type === 'awake' ||
+    name.includes('reveillez-vous') ||
+    name.includes('reveillez vous')
+  ) {
+    return {
+      value: 'awake',
+      label: 'Réveillez-vous !',
+      order: 3,
+    }
+  }
+
+  const label = getPublicationBaseName(publication)
+
+  return {
+    value: `custom:${normalizeText(label)}`,
+    label,
+    order: 4,
+  }
+}
+
+const comparePublicationDates = (left, right) => {
+  const leftYear = Number(left.year) || 0
+  const rightYear = Number(right.year) || 0
+
+  if (leftYear !== rightYear) return leftYear - rightYear
+
+  const leftMonth = Number(left.month) || 0
+  const rightMonth = Number(right.month) || 0
+
+  if (leftMonth !== rightMonth) return leftMonth - rightMonth
+
+  return left.name.localeCompare(right.name, 'fr')
+}
+
+const getPublicationMetadata = (publication, hasDate = true) => {
+  const language =
+    LANGUAGES.find((item) => item.value === publication.language)?.label ??
+    publication.language ??
+    'Langue non précisée'
+  const format =
+    FORMATS.find((item) => item.value === publication.format)?.label ??
+    publication.format ??
+    'Format non précisé'
+  const month =
+    MONTHS.find(
+      (item) => Number(item.value) === Number(publication.month),
+    )?.label
+  const period =
+    month && publication.year
+      ? `${month} ${publication.year}`
+      : publication.year || 'Date non précisée'
+
+  return hasDate
+    ? `${period} · ${language} · ${format}`
+    : `${language} · ${format}`
+}
+
 function Inventory({
   publications = [],
+  publicationCatalog = [],
   movements = [],
   onAdd,
+  onAddCatalogEntry,
   onChangeStock,
   onDelete,
   onNavigate,
   isAdmin = false,
 }) {
   const [selectedId, setSelectedId] = useState(null)
+  const [openCategory, setOpenCategory] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [movementType, setMovementType] = useState(null)
   const [quantity, setQuantity] = useState('')
   const [showHistory, setShowHistory] = useState(false)
 
-  const [publicationName, setPublicationName] = useState('')
+  const [publicationType, setPublicationType] = useState('')
+  const [newPublicationName, setNewPublicationName] = useState('')
+  const [newPublicationHasDate, setNewPublicationHasDate] =
+    useState('yes')
   const [publicationLanguage, setPublicationLanguage] = useState('')
-  const [publicationFormat, setPublicationFormat] = useState('Standard')
+  const [publicationFormat, setPublicationFormat] = useState('standard')
   const [publicationMonth, setPublicationMonth] = useState('')
   const [publicationYear, setPublicationYear] = useState('2026')
   const [initialStock, setInitialStock] = useState('')
@@ -75,21 +248,112 @@ function Inventory({
     [movements, selectedId],
   )
 
+  const groupedPublications = useMemo(() => {
+    const groups = new Map()
+
+    publications.forEach((publication) => {
+      const category = getPublicationCategory(publication)
+      const current = groups.get(category.value)
+
+      if (current) {
+        current.publications.push(publication)
+        return
+      }
+
+      groups.set(category.value, {
+        ...category,
+        publications: [publication],
+      })
+    })
+
+    return [...groups.values()]
+      .map((category) => ({
+        ...category,
+        publications: category.publications.sort(comparePublicationDates),
+      }))
+      .sort(
+        (left, right) =>
+          left.order - right.order ||
+          left.label.localeCompare(right.label, 'fr'),
+      )
+  }, [publications])
+
+  const availableCatalogEntries = useMemo(() => {
+    const entries = new Map()
+
+    DEFAULT_PUBLICATION_NAMES.forEach((name) => {
+      entries.set(normalizeText(name), {
+        name,
+        hasDate: true,
+      })
+    })
+
+    publications.forEach((publication) => {
+      const name = getPublicationBaseName(publication)
+      const category = getPublicationCategory(publication)
+
+      entries.set(normalizeText(name), {
+        name,
+        hasDate: category.order < 4,
+      })
+    })
+
+    publicationCatalog.forEach((entry) => {
+      const name = getPublicationBaseName({
+        name: entry.name,
+      })
+
+      if (name && entry.isActive !== false) {
+        entries.set(normalizeText(name), {
+          ...entry,
+          name,
+          hasDate: Boolean(entry.hasDate),
+        })
+      }
+    })
+
+    return [...entries.values()].sort((left, right) =>
+      left.name.localeCompare(right.name, 'fr'),
+    )
+  }, [publicationCatalog, publications])
+
+  const selectedCatalogEntry = availableCatalogEntries.find(
+    (entry) => entry.name === publicationType,
+  )
+  const publicationHasDate =
+    publicationType === '__new__'
+      ? newPublicationHasDate === 'yes'
+      : selectedCatalogEntry?.hasDate ?? true
+
+  const publicationHasDateInCatalog = (publication) => {
+    const baseName = normalizeText(getPublicationBaseName(publication))
+    const entry = availableCatalogEntries.find(
+      (item) => normalizeText(item.name) === baseName,
+    )
+
+    return entry?.hasDate ?? getPublicationCategory(publication).order < 4
+  }
+
   const totalStock = publications.reduce(
-    (total, publication) =>
-      total + Number(publication.stock ?? 0),
+    (total, publication) => total + Number(publication.stock ?? 0),
     0,
   )
 
-
   const resetAddForm = () => {
-    setPublicationName('')
+    setPublicationType('')
+    setNewPublicationName('')
+    setNewPublicationHasDate('yes')
     setPublicationLanguage('')
-    setPublicationFormat('Standard')
+    setPublicationFormat('standard')
     setPublicationMonth('')
     setPublicationYear('2026')
     setInitialStock('')
     setFormError('')
+  }
+
+  const openAddForm = () => {
+    resetAddForm()
+    setShowAddForm(true)
   }
 
   const closeAddForm = () => {
@@ -122,35 +386,77 @@ function Inventory({
 
     if (saving) return
 
-    const cleanPublicationName = publicationName.trim()
-
     if (
-      !cleanPublicationName ||
+      !publicationType ||
       !publicationLanguage ||
       !publicationFormat ||
-      !publicationMonth ||
-      !publicationYear ||
+      (publicationHasDate &&
+        (!publicationMonth || !publicationYear)) ||
       initialStock === ''
     ) {
       setFormError('Complète tous les champs de la publication.')
       return
     }
 
-    const monthNumber = String(publicationMonth).padStart(2, '0')
-    const cleanName = `${cleanPublicationName} - ${publicationLanguage} - ${publicationFormat} - ${monthNumber}/${publicationYear}`
-    const cleanStock = Math.max(
-      0,
-      Number(initialStock) || 0,
+    const cleanPublicationName =
+      publicationType === '__new__'
+        ? newPublicationName.trim()
+        : publicationType.trim()
+    const cleanStock = Math.max(0, Number(initialStock) || 0)
+    const language = LANGUAGES.find(
+      (item) => item.value === publicationLanguage,
     )
+    const format = FORMATS.find(
+      (item) => item.value === publicationFormat,
+    )
+    const month = publicationHasDate
+      ? MONTHS.find((item) => item.value === publicationMonth)
+      : null
 
-    const alreadyExists = publications.some(
+    if (
+      !cleanPublicationName ||
+      !language ||
+      !format ||
+      (publicationHasDate && !month)
+    ) {
+      setFormError('La publication sélectionnée est invalide.')
+      return
+    }
+
+    const cleanName = publicationHasDate
+      ? `${cleanPublicationName} - ${language.label} - ${format.label} - ${month.label} ${publicationYear}`
+      : `${cleanPublicationName} - ${language.label} - ${format.label}`
+    const normalizedPublicationName = normalizeText(cleanPublicationName)
+    const detectedPublicationType =
+      normalizedPublicationName.includes('tour de garde') &&
+      !normalizedPublicationName.includes('publique')
+        ? 'watchtower'
+        : normalizedPublicationName.includes('cahier') &&
+            (normalizedPublicationName.includes('vie') ||
+              normalizedPublicationName.includes('ministere'))
+          ? 'workbook'
+          : 'specific_request'
+    const existingPublication = publications.find(
       (publication) =>
-        publication.name.trim().toLocaleLowerCase('fr') ===
-        cleanName.toLocaleLowerCase('fr'),
+        normalizeText(publication.name) === normalizeText(cleanName) ||
+        (normalizeText(getPublicationBaseName(publication)) ===
+          normalizedPublicationName &&
+          publication.language === publicationLanguage &&
+          publication.format === publicationFormat &&
+          (!publicationHasDate ||
+            (Number(publication.month) === Number(publicationMonth) &&
+              Number(publication.year) === Number(publicationYear)))),
     )
 
-    if (alreadyExists) {
-      setFormError('Cette publication existe déjà pour ce mois et cette année.')
+    if (publicationType === '__new__' && !isAdmin) {
+      setFormError(
+        'Seul un administrateur peut créer un nouveau nom de publication.',
+      )
+      return
+    }
+
+    if (!isAdmin && cleanStock === 0) {
+      setFormError('Indique une quantité supérieure à zéro.')
       return
     }
 
@@ -158,40 +464,36 @@ function Inventory({
     setFormError('')
 
     try {
-      const normalizedName = cleanPublicationName
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLocaleLowerCase('fr')
-
-      const detectedPublicationType = normalizedName.includes('tour de garde')
-        ? 'watchtower'
-        : normalizedName.includes('cahier') &&
-            (normalizedName.includes('vie') || normalizedName.includes('ministere'))
-          ? 'workbook'
-          : 'specific_request'
-
-      const languageMap = {
-        'Français': 'fr',
-        'Italien': 'it',
-        'Néerlandais': 'nl',
-        'Anglais': 'en',
-        'Espagnol': 'es',
+      if (publicationType === '__new__' && isAdmin) {
+        await onAddCatalogEntry({
+          name: cleanPublicationName,
+          hasDate: publicationHasDate,
+        })
       }
 
-      const publicationLanguageCode =
-        languageMap[publicationLanguage] ?? 'other'
-      const publicationFormatCode =
-        publicationFormat === 'Grand Caractère' ? 'large' : 'standard'
+      if (existingPublication) {
+        if (cleanStock === 0) {
+          throw new Error(
+            'Cette édition existe déjà. Indique une quantité à ajouter.',
+          )
+        }
 
-      await onAdd({
-        name: cleanName,
-        stock: cleanStock,
-        publicationType: detectedPublicationType,
-        language: publicationLanguageCode,
-        format: publicationFormatCode,
-        month: Number(publicationMonth),
-        year: Number(publicationYear),
-      })
+        await onChangeStock(existingPublication.id, cleanStock)
+      } else {
+        await onAdd({
+          name: cleanName,
+          stock: cleanStock,
+          publicationType: detectedPublicationType,
+          language: publicationLanguage,
+          format: publicationFormat,
+          month: publicationHasDate
+            ? Number(publicationMonth)
+            : 1,
+          year: publicationHasDate
+            ? Number(publicationYear)
+            : new Date().getFullYear(),
+        })
+      }
 
       setShowAddForm(false)
       resetAddForm()
@@ -207,10 +509,7 @@ function Inventory({
 
     if (!selectedPublication || saving) return
 
-    const cleanQuantity = Math.max(
-      0,
-      Number(quantity) || 0,
-    )
+    const cleanQuantity = Math.max(0, Number(quantity) || 0)
 
     if (cleanQuantity === 0) {
       setFormError('Indique une quantité supérieure à zéro.')
@@ -221,16 +520,11 @@ function Inventory({
       movementType === 'remove' &&
       cleanQuantity > selectedPublication.stock
     ) {
-      setFormError(
-        'La quantité distribuée dépasse le stock disponible.',
-      )
+      setFormError('La quantité distribuée dépasse le stock disponible.')
       return
     }
 
-    const amount =
-      movementType === 'add'
-        ? cleanQuantity
-        : -cleanQuantity
+    const amount = movementType === 'add' ? cleanQuantity : -cleanQuantity
 
     setSaving(true)
     setFormError('')
@@ -247,12 +541,10 @@ function Inventory({
   }
 
   const removeSelectedPublication = async () => {
-    if (!selectedPublication || saving) return
+    if (!selectedPublication || saving || !isAdmin) return
 
     const confirmed = window.confirm(
-      'Supprimer définitivement « ' +
-        selectedPublication.name +
-        ' » ?',
+      `Supprimer définitivement « ${selectedPublication.name} » ?`,
     )
 
     if (!confirmed) return
@@ -278,20 +570,17 @@ function Inventory({
       <header className="inventory-header">
         <div>
           <p>PubliService</p>
-          <h1>Inventaire</h1>
+          <h1>Stock</h1>
         </div>
 
         <div className="header-actions">
           <button
             className="inventory-add-button"
             type="button"
-            onClick={() => {
-              resetAddForm()
-              setShowAddForm(true)
-            }}
+            onClick={openAddForm}
           >
             <PlusIcon />
-            <span>Ajouter</span>
+            <span>{isAdmin ? 'Créer' : 'Ajouter'}</span>
           </button>
 
           <SideMenu
@@ -306,14 +595,11 @@ function Inventory({
         <div className="inventory-summary">
           <span>
             {publications.length}{' '}
-            {publications.length > 1
-              ? 'publications'
-              : 'publication'}
+            {publications.length > 1 ? 'publications' : 'publication'}
           </span>
 
           <strong>
-            {totalStock}{' '}
-            {totalStock > 1 ? 'exemplaires' : 'exemplaire'}
+            {totalStock} {totalStock > 1 ? 'exemplaires' : 'exemplaire'}
           </strong>
         </div>
 
@@ -326,59 +612,104 @@ function Inventory({
             <h2>Aucune publication</h2>
 
             <p>
-              Les publications ajoutées apparaîtront ici.
+              {isAdmin
+                ? 'Crée la première publication pour cette assemblée.'
+                : "L’administrateur doit d’abord définir les publications de cette assemblée."}
             </p>
 
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => setShowAddForm(true)}
-            >
-              Ajouter une publication
-            </button>
+            {isAdmin && (
+              <button
+                className="primary-button"
+                type="button"
+                onClick={openAddForm}
+              >
+                Créer une publication
+              </button>
+            )}
           </div>
         ) : (
-          <div className="publication-list">
-            {publications.map((publication) => (
-              <button
-                className="publication-card"
-                type="button"
-                key={publication.id}
-                onClick={() =>
-                  openPublicationDetails(publication.id)
-                }
-              >
-                <span className="publication-icon">
-                  <BookIcon />
-                </span>
+          <div className="inventory-categories">
+            {groupedPublications.map((category) => {
+              const isOpen = openCategory === category.value
+              const categoryStock = category.publications.reduce(
+                (total, publication) =>
+                  total + Number(publication.stock ?? 0),
+                0,
+              )
 
-                <span className="publication-info">
-                  <strong>{publication.name}</strong>
-                  <small>Stock actuel</small>
-                </span>
+              return (
+                <section className="inventory-category" key={category.value}>
+                  <button
+                    className="inventory-category-button"
+                    type="button"
+                    onClick={() =>
+                      setOpenCategory(isOpen ? null : category.value)
+                    }
+                    aria-expanded={isOpen}
+                  >
+                    <span className="publication-icon">
+                      <BookIcon />
+                    </span>
 
-                <span
-                  className={`stock-pill ${
-                    publication.stock === 0
-                      ? 'stock-pill--low'
-                      : ''
-                  }`}
-                >
-                  {publication.stock}
-                </span>
+                    <span className="inventory-category-info">
+                      <strong>{category.label}</strong>
+                      <small>
+                        {category.publications.length}{' '}
+                        {category.publications.length > 1
+                          ? 'publications'
+                          : 'publication'}{' '}
+                        · {categoryStock} en stock
+                      </small>
+                    </span>
 
-                <span className="publication-chevron">›</span>
-              </button>
-            ))}
+                    <span
+                      className={`inventory-category-chevron${
+                        isOpen ? ' inventory-category-chevron--open' : ''
+                      }`}
+                    >
+                      ›
+                    </span>
+                  </button>
+
+                  {isOpen && (
+                    <div className="publication-list inventory-category-list">
+                      {category.publications.map((publication) => (
+                        <button
+                          className="publication-card"
+                          type="button"
+                          key={publication.id}
+                          onClick={() =>
+                            openPublicationDetails(publication.id)
+                          }
+                        >
+                          <span className="publication-info">
+                            <strong>{publication.name}</strong>
+                            <small>
+                              {getPublicationMetadata(
+                                publication,
+                                publicationHasDateInCatalog(publication),
+                              )}
+                            </small>
+                          </span>
+
+                          <span className="stock-pill">
+                            {publication.stock}
+                          </span>
+
+                          <span className="publication-chevron">›</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </div>
         )}
       </div>
 
       {selectedPublication && (
-        <div
-          className="sheet-backdrop"
-          onClick={closePublicationDetails}
-        >
+        <div className="sheet-backdrop" onClick={closePublicationDetails}>
           <section
             className="detail-sheet"
             onClick={(event) => event.stopPropagation()}
@@ -402,9 +733,7 @@ function Inventory({
             </div>
 
             {formError && (
-              <p className="form-message form-message--error">
-                {formError}
-              </p>
+              <p className="form-message form-message--error">{formError}</p>
             )}
 
             {!movementType && !showHistory && (
@@ -445,14 +774,16 @@ function Inventory({
                   Voir l’historique
                 </button>
 
-                <button
-                  className="sheet-close publisher-delete-button"
-                  type="button"
-                  onClick={removeSelectedPublication}
-                  disabled={saving}
-                >
-                  Supprimer la publication
-                </button>
+                {isAdmin && (
+                  <button
+                    className="sheet-close publisher-delete-button"
+                    type="button"
+                    onClick={removeSelectedPublication}
+                    disabled={saving}
+                  >
+                    Supprimer la publication
+                  </button>
+                )}
 
                 <button
                   className="sheet-close"
@@ -466,10 +797,7 @@ function Inventory({
             )}
 
             {movementType && (
-              <form
-                className="movement-form"
-                onSubmit={submitMovement}
-              >
+              <form className="movement-form" onSubmit={submitMovement}>
                 <h3>
                   {movementType === 'add'
                     ? 'Ajouter du stock'
@@ -488,9 +816,7 @@ function Inventory({
                         : undefined
                     }
                     value={quantity}
-                    onChange={(event) =>
-                      setQuantity(event.target.value)
-                    }
+                    onChange={(event) => setQuantity(event.target.value)}
                     placeholder="0"
                     autoFocus
                     disabled={saving}
@@ -525,10 +851,7 @@ function Inventory({
                 <div className="history-heading">
                   <h3>Historique</h3>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowHistory(false)}
-                  >
+                  <button type="button" onClick={() => setShowHistory(false)}>
                     Retour
                   </button>
                 </div>
@@ -539,10 +862,7 @@ function Inventory({
                   </p>
                 ) : (
                   publicationHistory.map((movement) => (
-                    <article
-                      className="history-row"
-                      key={movement.id}
-                    >
+                    <article className="history-row" key={movement.id}>
                       <span
                         className={
                           movement.amount > 0
@@ -557,9 +877,7 @@ function Inventory({
                       <div>
                         <strong>{movement.type}</strong>
                         <small>
-                          {formatMovementDate(
-                            movement.createdAt,
-                          )}
+                          {formatMovementDate(movement.createdAt)}
                         </small>
                       </div>
                     </article>
@@ -572,167 +890,210 @@ function Inventory({
       )}
 
       {showAddForm && (
-        <div
-          className="sheet-backdrop"
-          onClick={closeAddForm}
-        >
+        <div className="sheet-backdrop" onClick={closeAddForm}>
           <section
             className="detail-sheet"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="sheet-handle" />
 
-            <h2>Ajouter une publication</h2>
+            <h2>
+              {isAdmin
+                ? 'Créer une publication'
+                : 'Ajouter au stock'}
+            </h2>
 
-            <form
-              className="publication-form"
-              onSubmit={submitPublication}
-            >
-              <label>
-                Nom de la publication
-                <input
-                  value={publicationName}
-                  onChange={(event) =>
-                    setPublicationName(event.target.value)
-                  }
-                  placeholder="Ex. Tour de garde d’étude"
-                  autoFocus
-                  disabled={saving}
-                  required
-                />
-              </label>
-
-              <label>
-                Langue
-                <select
-                  value={publicationLanguage}
-                  onChange={(event) =>
-                    setPublicationLanguage(event.target.value)
-                  }
-                  disabled={saving}
-                  required
-                >
-                  <option value="">Sélectionner une langue</option>
-                  {LANGUAGES.map((language) => (
-                    <option key={language} value={language}>
-                      {language}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Format
-                <select
-                  value={publicationFormat}
-                  onChange={(event) =>
-                    setPublicationFormat(event.target.value)
-                  }
-                  disabled={saving}
-                  required
-                >
-                  {FORMATS.map((format) => (
-                    <option key={format} value={format}>
-                      {format}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="publication-period-fields">
+            <form className="publication-form" onSubmit={submitPublication}>
                 <label>
-                  Mois
+                  Publication
                   <select
-                    value={publicationMonth}
+                    value={publicationType}
+                    onChange={(event) => {
+                      setPublicationType(event.target.value)
+                      setNewPublicationName('')
+                    }}
+                    autoFocus
+                    disabled={saving}
+                    required
+                  >
+                    <option value="">Sélectionner une publication</option>
+                    {availableCatalogEntries.map((entry) => (
+                      <option
+                        key={normalizeText(entry.name)}
+                        value={entry.name}
+                      >
+                        {entry.name}
+                      </option>
+                    ))}
+                    {isAdmin && (
+                      <option value="__new__">
+                        + Créer une nouvelle publication
+                      </option>
+                    )}
+                  </select>
+                </label>
+
+                {isAdmin && publicationType === '__new__' && (
+                  <>
+                    <label>
+                      Nom de la publication
+                      <input
+                        value={newPublicationName}
+                        onChange={(event) =>
+                          setNewPublicationName(event.target.value)
+                        }
+                        placeholder="Ex. Bible"
+                        autoFocus
+                        disabled={saving}
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      Cette publication possède-t-elle une date ?
+                      <select
+                        value={newPublicationHasDate}
+                        onChange={(event) =>
+                          setNewPublicationHasDate(event.target.value)
+                        }
+                        disabled={saving}
+                      >
+                        <option value="yes">
+                          Oui — demander le mois et l’année
+                        </option>
+                        <option value="no">
+                          Non — publication sans date
+                        </option>
+                      </select>
+                    </label>
+                  </>
+                )}
+
+                <label>
+                  Langue
+                  <select
+                    value={publicationLanguage}
                     onChange={(event) =>
-                      setPublicationMonth(event.target.value)
+                      setPublicationLanguage(event.target.value)
                     }
                     disabled={saving}
                     required
                   >
-                    <option value="">Mois</option>
-                    {MONTHS.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
+                    <option value="">Sélectionner une langue</option>
+                    {LANGUAGES.map((language) => (
+                      <option key={language.value} value={language.value}>
+                        {language.label}
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <label>
-                  Année
+                  Format
                   <select
-                    value={publicationYear}
+                    value={publicationFormat}
                     onChange={(event) =>
-                      setPublicationYear(event.target.value)
+                      setPublicationFormat(event.target.value)
                     }
                     disabled={saving}
                     required
                   >
-                    {YEARS.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
+                    {FORMATS.map((format) => (
+                      <option key={format.value} value={format.value}>
+                        {format.label}
                       </option>
                     ))}
                   </select>
                 </label>
-              </div>
 
-              <label>
-                Quantité commandée
-                <input
-                  value={initialStock}
-                  onChange={(event) =>
-                    setInitialStock(event.target.value)
-                  }
-                  inputMode="numeric"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  disabled={saving}
-                />
-              </label>
+                {publicationHasDate && (
+                  <div className="publication-period-fields">
+                    <label>
+                      Mois
+                      <select
+                        value={publicationMonth}
+                        onChange={(event) =>
+                          setPublicationMonth(event.target.value)
+                        }
+                        disabled={saving}
+                        required
+                      >
+                        <option value="">Mois</option>
+                        {MONTHS.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
 
-              {publicationName.trim() &&
-                publicationLanguage &&
-                publicationFormat &&
-                publicationMonth && (
-                  <p className="publication-preview">
-                    <span>Aperçu</span>
-                    <strong>
-                      {publicationName.trim()} - {publicationLanguage} -{' '}
-                      {publicationFormat} -{' '}
-                      {String(publicationMonth).padStart(2, '0')}/
-                      {publicationYear}
-                    </strong>
+                    <label>
+                      Année
+                      <select
+                        value={publicationYear}
+                        onChange={(event) =>
+                          setPublicationYear(event.target.value)
+                        }
+                        disabled={saving}
+                        required
+                      >
+                        {YEARS.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+
+                <label>
+                  {isAdmin ? 'Stock initial' : 'Quantité reçue'}
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={isAdmin ? '0' : '1'}
+                    value={initialStock}
+                    onChange={(event) => setInitialStock(event.target.value)}
+                    placeholder="0"
+                    disabled={saving}
+                    required
+                  />
+                </label>
+
+                <p className="form-note">
+                  {isAdmin
+                    ? 'Une nouvelle publication sera automatiquement ajoutée à cette liste pour l’assemblée sélectionnée.'
+                    : 'Choisis la publication, sa langue, son format et sa date éventuelle avant d’ajouter la quantité reçue.'}
+                </p>
+
+                {formError && (
+                  <p className="form-message form-message--error">
+                    {formError}
                   </p>
                 )}
 
-              {formError && (
-                <p className="form-message form-message--error">
-                  {formError}
-                </p>
-              )}
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={saving}
+                >
+                  {saving
+                    ? 'Enregistrement…'
+                    : isAdmin
+                      ? 'Enregistrer la publication'
+                      : 'Ajouter au stock'}
+                </button>
 
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={saving}
-              >
-                {saving
-                  ? 'Ajout…'
-                  : 'Créer la publication'}
-              </button>
-
-              <button
-                className="sheet-close"
-                type="button"
-                disabled={saving}
-                onClick={closeAddForm}
-              >
-                Annuler
-              </button>
-            </form>
+                <button
+                  className="sheet-close"
+                  type="button"
+                  onClick={closeAddForm}
+                  disabled={saving}
+                >
+                  Annuler
+                </button>
+              </form>
           </section>
         </div>
       )}
@@ -741,4 +1102,3 @@ function Inventory({
 }
 
 export default Inventory
-

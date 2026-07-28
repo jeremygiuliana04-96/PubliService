@@ -29,6 +29,9 @@ function normalizeCache(cache, assemblyId) {
     publications: Array.isArray(cache.publications)
       ? cache.publications
       : [],
+    publicationCatalog: Array.isArray(cache.publicationCatalog)
+      ? cache.publicationCatalog
+      : [],
     movements: Array.isArray(cache.movements)
       ? cache.movements
       : [],
@@ -50,6 +53,7 @@ export async function saveAssemblyCache(
   assemblyId,
   {
     publications = [],
+    publicationCatalog = [],
     movements = [],
     publishers = [],
     pendingDistributions = [],
@@ -62,6 +66,7 @@ export async function saveAssemblyCache(
     version: CACHE_VERSION,
     assemblyId: String(assemblyId),
     publications,
+    publicationCatalog,
     movements,
     publishers,
     pendingDistributions,

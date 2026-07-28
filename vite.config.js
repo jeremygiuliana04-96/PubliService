@@ -6,13 +6,14 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      registerType: 'prompt',
+      injectRegister: null,
       manifest: {
         name: 'PubliService',
         short_name: 'PubliService',
-        description: 'Gestion des publications et des distributions',
-        theme_color: '#ffffff',
+        description:
+          'Gestion des publications, des stocks et des distributions',
+        theme_color: '#083b83',
         background_color: '#ffffff',
         display: 'standalone',
         id: '/',
@@ -34,8 +35,6 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
         navigateFallback: 'index.html',
         globPatterns: [
           '**/*.{js,css,html,ico,png,svg,webmanifest}',

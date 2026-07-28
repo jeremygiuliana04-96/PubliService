@@ -12,15 +12,21 @@ const formatDate = (value) =>
 const sameOverview = (left, right) =>
   JSON.stringify(left ?? []) === JSON.stringify(right ?? [])
 
+const positiveNumber = (value) =>
+  Math.max(0, Number(value) || 0)
+
 function Dashboard({
   publications = [],
   publishers = [],
+  pendingDistributions = [],
   cachedStockOverview = [],
   onStockOverviewChange,
   currentAssembly,
   onNavigate,
   isAdmin = false,
   isOnline = true,
+  pendingSyncCount = 0,
+  syncStatus = 'idle',
 }) {
   const [stockOverview, setStockOverview] = useState(
     cachedStockOverview,
@@ -48,6 +54,7 @@ function Dashboard({
           publishers,
           publications,
           currentAssembly,
+          pendingDistributions,
         })
 
         if (!cancelled) {
@@ -59,7 +66,7 @@ function Dashboard({
         }
       } catch (error) {
         console.error(
-          'Erreur lors du chargement de l’état du stock :',
+          'Erreur lors du chargement de la prévision :',
           error,
         )
 
@@ -71,7 +78,7 @@ function Dashboard({
             setStockOverview([])
             setOverviewError(
               error?.message ??
-                'Impossible de charger l’état du stock.',
+                'Impossible de calculer la prévision de commande.',
             )
           }
         }
@@ -90,27 +97,75 @@ function Dashboard({
   }, [
     publishers,
     publications,
+    pendingDistributions,
     cachedStockOverview,
     currentAssembly,
     isOnline,
     onStockOverviewChange,
   ])
 
+  const syncLabel = !isOnline
+    ? 'Hors ligne'
+    : syncStatus === 'syncing'
+      ? 'Synchronisation…'
+      : syncStatus === 'error'
+        ? 'À vérifier'
+        : pendingSyncCount > 0
+          ? `${pendingSyncCount} en attente`
+          : 'Synchronisé'
+
+  const syncModifier = !isOnline
+    ? 'offline'
+    : syncStatus === 'error'
+      ? 'error'
+      : pendingSyncCount > 0 || syncStatus === 'syncing'
+        ? 'pending'
+        : 'ready'
 
   return (
     <section className="phone-page dashboard-page">
       <header className="dashboard-header dashboard-header--compact">
         <div className="dashboard-topline">
-          <div>
+          <div className="dashboard-identity">
             <p className="app-name">PubliService</p>
-            <p>Assemblée de {currentAssembly?.name ?? '—'}</p>
+
+            {isAdmin ? (
+              <button
+                className="dashboard-assembly-button"
+                type="button"
+                onClick={() => onNavigate('assemblies')}
+              >
+                <span>
+                  Assemblée de {currentAssembly?.name ?? '—'}
+                </span>
+                <small>Changer</small>
+              </button>
+            ) : (
+              <p>
+                Assemblée de {currentAssembly?.name ?? '—'}
+              </p>
+            )}
           </div>
 
-          <SideMenu
-            activeScreen="dashboard"
-            onNavigate={onNavigate}
-            isAdmin={isAdmin}
-          />
+          <div className="dashboard-header-actions">
+            <button
+              className={`dashboard-sync-pill dashboard-sync-pill--${syncModifier}`}
+              type="button"
+              onClick={() => onNavigate('syncStatus')}
+              aria-label={`État de la synchronisation : ${syncLabel}`}
+            >
+              <span aria-hidden="true">↻</span>
+              <span className="dashboard-sync-label">
+                {syncLabel}
+              </span>
+            </button>
+
+            <SideMenu
+              activeScreen="dashboard"
+              onNavigate={onNavigate}
+              isAdmin={isAdmin}
+            />
+          </div>
         </div>
 
         <div className="dashboard-date">
@@ -118,117 +173,93 @@ function Dashboard({
         </div>
       </header>
 
-      <div className="dashboard-content dashboard-content--compact">
-
-        <section className="dashboard-section">
-          <div className="section-heading section-heading--row">
-            <div>
-              <h2 style={{ marginTop: '24px' }}>
-                État du stock
-              </h2>
-            </div>
+      <div className="dashboard-content dashboard-home-content">
+        <section className="dashboard-section dashboard-forecast-section">
+          <div className="section-heading">
+            <span className="dashboard-card-kicker">
+              Préparation mensuelle
+            </span>
+            <h2>Prévision de commande</h2>
+            <p>
+              Une estimation basée sur le stock actuel et les
+              publications restant à distribuer.
+            </p>
           </div>
 
           {overviewLoading ? (
             <div className="empty-history">
-              Calcul de l’état du stock…
+              Calcul de la prévision de commande…
             </div>
           ) : overviewError ? (
-            <div className="empty-history">
-              {overviewError}
-            </div>
+            <div className="empty-history">{overviewError}</div>
           ) : stockOverview.length === 0 ? (
             <div className="empty-history">
-              Aucune publication dans l’inventaire.
+              Aucune publication dans le stock.
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gap: 14,
-              }}
-            >
-              {stockOverview.map((item) => {
-                return (
-                  <article
-                    key={item.publicationId}
-                    style={{
-                      padding: 18,
-                      borderRadius: 18,
-                      border: '1px solid #e5e7eb',
-                      background: '#ffffff',
-                      boxShadow:
-                        '0 8px 24px rgba(15, 23, 42, 0.06)',
-                    }}
-                  >
+            <>
+              <div className="dashboard-forecast-list">
+                {stockOverview.map((item) => {
+                  const stock = positiveNumber(item.stock)
+                  const need = positiveNumber(
+                    item.toDistribute,
+                  )
+                  const toOrder = Math.max(0, need - stock)
+                  const surplus = Math.max(0, stock - need)
+
+                  return (
                     <button
+                      className="dashboard-forecast-card"
                       type="button"
+                      key={item.publicationId}
                       onClick={() => onNavigate('inventory')}
-                      style={{
-                        width: '100%',
-                        appearance: 'none',
-                        border: 0,
-                        padding: 0,
-                        background: 'transparent',
-                        color: 'inherit',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                      }}
                     >
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: 17,
-                          lineHeight: 1.35,
-                        }}
-                      >
-                        📘 {item.publicationName}
-                      </h3>
+                      <span className="dashboard-forecast-title">
+                        {item.publicationName}
+                      </span>
 
-                      <div
-  style={{
-    marginTop: 18,
-    textAlign: 'center',
-  }}
->
-  <div
-    style={{
-      fontSize: 15,
-      opacity: 0.7,
-      marginBottom: 8,
-    }}
-  >
-    Stock restant
-  </div>
-
-  <div
-    style={{
-      fontSize: 34,
-      fontWeight: 800,
-      lineHeight: 1,
-    }}
-  >
-    {item.stockAfterDistribution}
-  </div>
-
-  <div
-    style={{
-      marginTop: 6,
-      fontSize: 15,
-      opacity: 0.75,
-    }}
-  >
-    {item.stockAfterDistribution > 1
-      ? 'exemplaires'
-      : 'exemplaire'}
-  </div>
-</div>
-</button>
-                  </article>
-                )
-              })}
-            </div>
+                      <span className="dashboard-forecast-values">
+                        <span>
+                          <small>Besoin prévu</small>
+                          <strong>{need}</strong>
+                        </span>
+                        <span>
+                          <small>Stock actuel</small>
+                          <strong>{stock}</strong>
+                        </span>
+                        <span>
+                          <small>À commander</small>
+                          <strong>{toOrder}</strong>
+                        </span>
+                        <span>
+                          <small>Reste estimé</small>
+                          <strong>{surplus}</strong>
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
           )}
+        </section>
+
+        <section
+          className="dashboard-quick-actions"
+          aria-label="Actions rapides"
+        >
+          <button
+            type="button"
+            onClick={() => onNavigate('inventory')}
+          >
+            Gérer le stock
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('publishers')}
+          >
+            Gérer les proclamateurs
+          </button>
         </section>
       </div>
     </section>

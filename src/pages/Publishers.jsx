@@ -81,6 +81,17 @@ function Publishers({
   const [distributionHistory, setDistributionHistory] = useState([])
   const [detailTab, setDetailTab] = useState('preferences')
 
+  useEffect(() => {
+    if (!showForm) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [showForm])
+
   const filteredPublishers = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('fr')
 
@@ -367,14 +378,20 @@ function Publishers({
       </div>
 
       {showForm && (
-        <div className="sheet-backdrop" onClick={closeForm}>
+        <div
+          className="sheet-backdrop publisher-sheet-backdrop"
+          onClick={closeForm}
+        >
           <section
             className="detail-sheet publisher-detail-sheet"
             onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="publisher-dialog-title"
           >
             <div className="sheet-handle" />
 
-            <h2>
+            <h2 id="publisher-dialog-title">
               {selectedPublisher
                 ? `${firstName} ${lastName}`
                 : 'Ajouter un proclamateur'}

@@ -80,18 +80,22 @@ function AssemblyIcon() {
 
 const MENU_ITEMS = [
   { label: 'Accueil', screen: 'dashboard', icon: <HomeIcon /> },
-  { label: 'Publications', screen: 'inventory', icon: <BookIcon /> },
   {
     label: 'Distribution',
     screen: 'distribution',
     icon: <DistributionIcon />,
   },
+  { label: 'Stock', screen: 'inventory', icon: <BookIcon /> },
   {
     label: 'Proclamateurs',
     screen: 'publishers',
     icon: <PeopleIcon />,
   },
-  { label: 'Plus', screen: 'more', icon: <SettingsIcon /> },
+  {
+    label: 'Réglages et aide',
+    screen: 'more',
+    icon: <SettingsIcon />,
+  },
 ]
 
 function SideMenu({ activeScreen, onNavigate, isAdmin = false }) {
@@ -117,8 +121,8 @@ function SideMenu({ activeScreen, onNavigate, isAdmin = false }) {
     ? [
         ...MENU_ITEMS.slice(0, 4),
         {
-          label: 'Assemblées',
-          screen: 'assemblies',
+          label: 'Administration',
+          screen: 'administration',
           icon: <AssemblyIcon />,
         },
         MENU_ITEMS[4],
@@ -168,7 +172,13 @@ function SideMenu({ activeScreen, onNavigate, isAdmin = false }) {
                 <button
                   key={item.screen}
                   className={
-                    activeScreen === item.screen ? 'is-active' : ''
+                    activeScreen === item.screen ||
+                    (item.screen === 'administration' &&
+                      ['assemblies', 'adminPanel'].includes(
+                        activeScreen,
+                      ))
+                      ? 'is-active'
+                      : ''
                   }
                   type="button"
                   onClick={() => navigate(item.screen)}

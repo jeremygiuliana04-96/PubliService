@@ -1,5 +1,15 @@
 PubliService — Historique Supabase + dashboard simplifié
 
+MISE À JOUR 1.4.0
+------------------
+Avant de déployer la version 1.4.0, exécutez dans l’éditeur SQL
+de Supabase le fichier :
+
+supabase-publication-catalog-v1.4.sql
+
+Le script ajoute le catalogue des publications sans supprimer les
+stocks, distributions ou historiques existants.
+
 1. Copiez le contenu du dossier src dans :
    C:\Users\Jérémy Giuliana\Documents\publiservice\src
 

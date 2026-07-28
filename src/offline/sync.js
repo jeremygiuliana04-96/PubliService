@@ -1,6 +1,7 @@
 import { distributeAllRemaining } from '../services/distributionService'
 import {
   listOfflineOperations,
+  markOfflineOperationFailed,
   removeOfflineOperation,
 } from './queue'
 
@@ -50,11 +51,17 @@ export async function syncOfflineOperations({
       await removeOfflineOperation(operation.id)
       completed.push(operation)
     } catch (error) {
+      const errorMessage =
+        error?.message ?? 'La synchronisation a échoué.'
+
+      await markOfflineOperationFailed(
+        operation.id,
+        errorMessage,
+      )
+
       failed.push({
         ...operation,
-        error:
-          error?.message ??
-          'La synchronisation a échoué.',
+        error: errorMessage,
       })
 
       if (

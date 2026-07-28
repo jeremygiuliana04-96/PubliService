@@ -1,7 +1,5 @@
 import SideMenu from '../components/SideMenu'
-import {
-  HomeIcon,
-} from '../components/Icons'
+import packageInfo from '../../package.json'
 
 function Chevron() {
   return (
@@ -11,24 +9,38 @@ function Chevron() {
   )
 }
 
+function formatSyncDate(value) {
+  if (!value) return 'Aucune synchronisation enregistrée'
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Date indisponible'
+  }
+
+  return new Intl.DateTimeFormat('fr-BE', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
 function More({
-  currentAssembly,
-  publisherCount = 0,
+  pendingSyncCount = 0,
+  syncStatus = 'idle',
+  lastSyncAt = null,
   onNavigate,
   onLogout,
   logoutLoading = false,
   isAdmin = false,
 }) {
-
-  const assemblyName = currentAssembly?.name ?? '—'
-  const assemblyCode = currentAssembly?.code ?? '—'
-
   return (
     <section className="phone-page dashboard-page more-page">
       <header className="more-header">
         <div>
           <p>PubliService</p>
-          <h1>Plus</h1>
+          <h1>Réglages et aide</h1>
         </div>
 
         <SideMenu
@@ -40,90 +52,137 @@ function More({
 
       <div className="more-content">
         <section className="more-section">
-          <h2>Assemblée</h2>
+          <h2>Application</h2>
 
-          <div className="more-row">
-            <span className="more-row-icon">
-              <HomeIcon />
+          <button
+            className="more-row"
+            type="button"
+            onClick={() => onNavigate('syncStatus')}
+          >
+            <span className="more-row-icon" aria-hidden="true">
+              ↻
             </span>
 
             <span className="more-row-text">
-              <strong>Assemblée connectée</strong>
-              <small>{assemblyName}</small>
-              <small>Code : {assemblyCode}</small>
-
-              {isAdmin ? (
-                <>
-                  <small>
-                    Statut :{' '}
-                    {currentAssembly?.isActive ? 'Active' : 'Inactive'}
-                  </small>
-                  <small>Proclamateurs : {publisherCount}</small>
-                </>
-              ) : null}
+              <strong>Synchronisation</strong>
+              <small>
+                {syncStatus === 'syncing'
+                  ? 'Synchronisation en cours…'
+                  : pendingSyncCount > 0
+                    ? `${pendingSyncCount} opération${
+                        pendingSyncCount > 1 ? 's' : ''
+                      } en attente`
+                    : `Dernière : ${formatSyncDate(lastSyncAt)}`}
+              </small>
             </span>
-          </div>
+
+            {pendingSyncCount > 0 ? (
+              <span
+                className="more-row-count"
+                aria-label={`${pendingSyncCount} opérations en attente`}
+              >
+                {pendingSyncCount}
+              </span>
+            ) : (
+              <Chevron />
+            )}
+          </button>
+
+          <button
+            className="more-row"
+            type="button"
+            onClick={() => onNavigate('installation')}
+          >
+            <span className="more-row-icon" aria-hidden="true">
+              ↓
+            </span>
+
+            <span className="more-row-text">
+              <strong>Installation et mises à jour</strong>
+              <small>
+                Installer PubliService sur cet appareil
+              </small>
+            </span>
+
+            <Chevron />
+          </button>
         </section>
 
-        {isAdmin ? (
-          <section className="more-section">
-            <h2>Administration</h2>
+        <section className="more-section">
+          <h2>Informations et assistance</h2>
 
-            <button
-              className="more-row"
-              type="button"
-              onClick={() => onNavigate('assemblies')}
-            >
-              <span className="more-row-icon" aria-hidden="true">
-                🏛️
-              </span>
+          <button
+            className="more-row"
+            type="button"
+            onClick={() => onNavigate('privacy')}
+          >
+            <span className="more-row-icon" aria-hidden="true">
+              🛡️
+            </span>
 
-              <span className="more-row-text">
-                <strong>Assemblées</strong>
-                <small>Créer et gérer les assemblées</small>
-              </span>
+            <span className="more-row-text">
+              <strong>Confidentialité et données</strong>
+              <small>
+                Données utilisées, conservation et droits
+              </small>
+            </span>
 
-              <Chevron />
-            </button>
+            <Chevron />
+          </button>
 
-            <button
-              className="more-row"
-              type="button"
-              onClick={() => onNavigate('adminPanel')}
-            >
-              <span
-                className="more-row-icon more-row-icon--users"
-                aria-hidden="true"
-              >
-                👤
-              </span>
+          <button
+            className="more-row"
+            type="button"
+            onClick={() => onNavigate('terms')}
+          >
+            <span className="more-row-icon" aria-hidden="true">
+              📄
+            </span>
 
-              <span className="more-row-text">
-                <strong>Administrateurs</strong>
-                <small>Inviter et gérer les administrateurs</small>
-              </span>
+            <span className="more-row-text">
+              <strong>Conditions d’utilisation</strong>
+              <small>Règles et responsabilités</small>
+            </span>
 
-              <Chevron />
-            </button>
+            <Chevron />
+          </button>
 
-            <button
-              className="more-row"
-              type="button"
-              onClick={() => onNavigate('assemblies')}
-            >
-              <span className="more-row-icon" aria-hidden="true">
-                🔑
-              </span>
+          <button
+            className="more-row"
+            type="button"
+            onClick={() => onNavigate('releaseNotes')}
+          >
+            <span className="more-row-icon" aria-hidden="true">
+              ✨
+            </span>
 
-              <span className="more-row-text">
-                <strong>Codes d’accès</strong>
-                <small>Attribuer et gérer les codes d’assemblée</small>
-              </span>
+            <span className="more-row-text">
+              <strong>Notes de mise à jour</strong>
+              <small>Version {packageInfo.version}</small>
+            </span>
 
-              <Chevron />
-            </button>
-          </section>
-        ) : null}
+            <Chevron />
+          </button>
+
+          <button
+            className="more-row"
+            type="button"
+            onClick={() => onNavigate('support')}
+          >
+            <span className="more-row-icon" aria-hidden="true">
+              ✉️
+            </span>
+
+            <span className="more-row-text">
+              <strong>Assistance et suppression</strong>
+              <small>
+                Contacter PubliService ou supprimer des données
+              </small>
+            </span>
+
+            <Chevron />
+          </button>
+        </section>
 
         <section className="more-section">
           <h2>Compte</h2>
@@ -149,6 +208,11 @@ function More({
             </span>
           </button>
         </section>
+
+        <p className="more-version">
+          PubliService {packageInfo.version}
+          <span>Application indépendante et non officielle</span>
+        </p>
       </div>
     </section>
   )
